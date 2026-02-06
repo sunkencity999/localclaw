@@ -1,7 +1,26 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+
+function isCommandAvailable(command) {
+  try {
+    const res = spawnSync(command, ["--version"], {
+      stdio: "ignore",
+      shell: process.platform === "win32",
+    });
+    return res.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+const runner = isCommandAvailable(pnpm)
+  ? { command: pnpm, wrap: (args) => args }
+  : { command: npm, wrap: (args) => ["exec", "--", ...args] };
+
+const includeExtensions = runner.command === pnpm || process.env.OPENCLAW_TEST_EXTENSIONS === "1";
 
 const runs = [
   {
@@ -16,7 +35,14 @@ const runs = [
     name: "gateway",
     args: ["vitest", "run", "--config", "vitest.gateway.config.ts"],
   },
-];
+].filter((entry) => includeExtensions || entry.name !== "extensions");
+
+if (!includeExtensions) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "Skipping extension tests (pnpm not found). Set OPENCLAW_TEST_EXTENSIONS=1 to run them via npm exec.",
+  );
+}
 
 const children = new Set();
 const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
@@ -61,7 +87,7 @@ const runOnce = (entry, extraArgs = []) =>
       (acc, flag) => (acc.includes(flag) ? acc : `${acc} ${flag}`.trim()),
       nodeOptions,
     );
-    const child = spawn(pnpm, args, {
+    const child = spawn(runner.command, runner.wrap(args), {
       stdio: "inherit",
       env: { ...process.env, VITEST_GROUP: entry.name, NODE_OPTIONS: nextNodeOptions },
       shell: process.platform === "win32",

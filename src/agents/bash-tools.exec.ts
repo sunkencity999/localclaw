@@ -151,6 +151,8 @@ type ExecProcessOutcome = {
   exitSignal: NodeJS.Signals | number | null;
   durationMs: number;
   aggregated: string;
+  stdout: string;
+  stderr: string;
   timedOut: boolean;
   reason?: string;
 };
@@ -619,6 +621,8 @@ async function runExecProcess(opts: {
     }
     markExited(session, null, "SIGKILL", "failed");
     maybeNotifyOnExit(session, "failed");
+    const stdout = session.pendingStdout.join("").trim();
+    const stderr = session.pendingStderr.join("").trim();
     const aggregated = session.aggregated.trim();
     const reason = `Command timed out after ${opts.timeoutSec} seconds`;
     settle({
@@ -626,6 +630,8 @@ async function runExecProcess(opts: {
       exitCode: null,
       exitSignal: "SIGKILL",
       durationMs: Date.now() - startedAt,
+      stdout,
+      stderr,
       aggregated,
       timedOut: true,
       reason: aggregated ? `${aggregated}\n\n${reason}` : reason,
@@ -722,6 +728,8 @@ async function runExecProcess(opts: {
       if (settled) {
         return;
       }
+      const stdout = session.pendingStdout.join("").trim();
+      const stderr = session.pendingStderr.join("").trim();
       const aggregated = session.aggregated.trim();
       if (!isSuccess) {
         const reason = timedOut
@@ -737,6 +745,8 @@ async function runExecProcess(opts: {
           exitCode: code ?? null,
           exitSignal: exitSignal ?? null,
           durationMs,
+          stdout,
+          stderr,
           aggregated,
           timedOut,
           reason: message,
@@ -748,6 +758,8 @@ async function runExecProcess(opts: {
         exitCode: code ?? 0,
         exitSignal: exitSignal ?? null,
         durationMs,
+        stdout,
+        stderr,
         aggregated,
         timedOut: false,
       });
@@ -773,6 +785,8 @@ async function runExecProcess(opts: {
         }
         markExited(session, null, null, "failed");
         maybeNotifyOnExit(session, "failed");
+        const stdout = session.pendingStdout.join("").trim();
+        const stderr = session.pendingStderr.join("").trim();
         const aggregated = session.aggregated.trim();
         const message = aggregated ? `${aggregated}\n\n${String(err)}` : String(err);
         settle({
@@ -780,6 +794,8 @@ async function runExecProcess(opts: {
           exitCode: null,
           exitSignal: null,
           durationMs: Date.now() - startedAt,
+          stdout,
+          stderr,
           aggregated,
           timedOut,
           reason: message,
@@ -1594,11 +1610,12 @@ export function createExecTool(
               reject(new Error(outcome.reason ?? "Command failed."));
               return;
             }
+            const output = outcome.stdout || outcome.stderr || outcome.aggregated;
             resolve({
               content: [
                 {
                   type: "text",
-                  text: `${getWarningText()}${outcome.aggregated || "(no output)"}`,
+                  text: `${getWarningText()}${output || "(no output)"}`,
                 },
               ],
               details: {
@@ -1607,7 +1624,7 @@ export function createExecTool(
                 durationMs: outcome.durationMs,
                 aggregated: outcome.aggregated,
                 cwd: run.session.cwd,
-              },
+              } satisfies ExecToolDetails,
             });
           })
           .catch((err) => {
