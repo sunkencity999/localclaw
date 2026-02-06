@@ -104,6 +104,11 @@ Tip: `--json` does **not** imply non-interactive mode. Use `--non-interactive` (
    - More detail: [Moonshot AI (Kimi + Kimi Coding)](/providers/moonshot)
    - **Skip**: no auth configured yet.
    - Pick a default model from detected options (or enter provider/model manually).
+     - If local models are detected, the wizard offers a "Local models" picker (Ollama/LM Studio/vLLM).
+       Default local endpoints:
+       - `ollama`: `http://127.0.0.1:11434/v1`
+       - `lmstudio`: `http://127.0.0.1:1234/v1`
+       - `vllm`: `http://127.0.0.1:8000/v1`
    - Wizard runs a model check and warns if the configured model is unknown or missing auth.
 
 - OAuth credentials live in `~/.openclaw/credentials/oauth.json`; auth profiles live in `~/.openclaw/agents/<agentId>/agent/auth-profiles.json` (API keys + OAuth).

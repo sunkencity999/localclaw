@@ -199,12 +199,16 @@ export async function resolveApiKeyForProvider(params: {
     };
   }
 
+  const normalized = normalizeProviderId(provider);
+  if (normalized === "ollama" || normalized === "lmstudio" || normalized === "vllm") {
+    return { apiKey: "local", source: "local", mode: "api-key" };
+  }
+
   const customKey = getCustomProviderApiKey(cfg, provider);
   if (customKey) {
     return { apiKey: customKey, source: "models.json", mode: "api-key" };
   }
 
-  const normalized = normalizeProviderId(provider);
   if (authOverride === undefined && normalized === "amazon-bedrock") {
     return resolveAwsSdkAuthInfo();
   }

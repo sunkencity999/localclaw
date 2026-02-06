@@ -12,6 +12,9 @@ Interactive prompt to set up credentials, devices, and agent defaults.
 Note: The **Model** section now includes a multi-select for the
 `agents.defaults.models` allowlist (what shows up in `/model` and the model picker).
 
+If local models are detected, the **Model** section also offers a local model picker
+(Ollama/LM Studio/vLLM) so you can choose a `provider/model` without typing it manually.
+
 Tip: `openclaw config` without a subcommand opens the same wizard. Use
 `openclaw config get|set|unset` for non-interactive edits.
 

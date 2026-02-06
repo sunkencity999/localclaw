@@ -3,7 +3,7 @@ import type { WizardPrompter, WizardSelectOption } from "../wizard/prompts.js";
 import { ensureAuthProfileStore, listProfilesForProvider } from "../agents/auth-profiles.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { getCustomProviderApiKey, resolveEnvApiKey } from "../agents/model-auth.js";
-import { loadModelCatalog } from "../agents/model-catalog.js";
+import { type ModelCatalogEntry, loadModelCatalog } from "../agents/model-catalog.js";
 import {
   buildAllowedModelSet,
   buildModelAliasIndex,
@@ -17,6 +17,17 @@ const KEEP_VALUE = "__keep__";
 const MANUAL_VALUE = "__manual__";
 const PROVIDER_FILTER_THRESHOLD = 30;
 
+export const LOCAL_MODEL_PROVIDERS = ["ollama", "lmstudio", "vllm"] as const;
+
+export function isLocalModelProvider(provider: string): boolean {
+  const normalized = normalizeProviderId(provider);
+  return LOCAL_MODEL_PROVIDERS.includes(normalized as (typeof LOCAL_MODEL_PROVIDERS)[number]);
+}
+
+export function catalogHasLocalModels(catalog: ModelCatalogEntry[]): boolean {
+  return catalog.some((entry) => isLocalModelProvider(entry.provider));
+}
+
 // Models that are internal routing features and should not be shown in selection lists.
 // These may be valid as defaults (e.g., set automatically during auth flow) but are not
 // directly callable via API and would cause "Unknown model" errors if selected manually.
@@ -29,6 +40,8 @@ type PromptDefaultModelParams = {
   includeManual?: boolean;
   ignoreAllowlist?: boolean;
   preferredProvider?: string;
+  filterProviders?: string[];
+  catalog?: ModelCatalogEntry[];
   agentDir?: string;
   message?: string;
 };
@@ -36,11 +49,52 @@ type PromptDefaultModelParams = {
 type PromptDefaultModelResult = { model?: string };
 type PromptModelAllowlistResult = { models?: string[] };
 
+export async function promptDefaultModelWithLocalOptions(
+  params: PromptDefaultModelParams,
+): Promise<PromptDefaultModelResult> {
+  const cfg = params.config;
+  const catalog = params.catalog ?? (await loadModelCatalog({ config: cfg, useCache: false }));
+  if (!catalogHasLocalModels(catalog)) {
+    return promptDefaultModel({ ...params, catalog });
+  }
+
+  const source = await params.prompter.select({
+    message: "Default model source",
+    options: [
+      {
+        value: "local",
+        label: "Local models (Ollama/LM Studio/vLLM)",
+        hint: "Detected on localhost",
+      },
+      { value: "all", label: "All models" },
+    ],
+    initialValue: "local",
+  });
+
+  if (source === "local") {
+    return promptDefaultModel({
+      ...params,
+      catalog,
+      filterProviders: [...LOCAL_MODEL_PROVIDERS],
+      preferredProvider: undefined,
+      message: params.message ?? "Default local model",
+    });
+  }
+
+  return promptDefaultModel({
+    ...params,
+    catalog,
+  });
+}
+
 function hasAuthForProvider(
   provider: string,
   cfg: OpenClawConfig,
   store: ReturnType<typeof ensureAuthProfileStore>,
 ) {
+  if (isLocalModelProvider(provider)) {
+    return true;
+  }
   if (listProfilesForProvider(store, provider).length > 0) {
     return true;
   }
@@ -107,6 +161,8 @@ export async function promptDefaultModel(
   const allowKeep = params.allowKeep ?? true;
   const includeManual = params.includeManual ?? true;
   const ignoreAllowlist = params.ignoreAllowlist ?? false;
+  const filterProvidersRaw = params.filterProviders ?? [];
+  const filterProviders = new Set(filterProvidersRaw.map((p) => normalizeProviderId(p)));
   const preferredProviderRaw = params.preferredProvider?.trim();
   const preferredProvider = preferredProviderRaw
     ? normalizeProviderId(preferredProviderRaw)
@@ -121,7 +177,7 @@ export async function promptDefaultModel(
   const resolvedKey = modelKey(resolved.provider, resolved.model);
   const configuredKey = configuredRaw ? resolvedKey : "";
 
-  const catalog = await loadModelCatalog({ config: cfg, useCache: false });
+  const catalog = params.catalog ?? (await loadModelCatalog({ config: cfg, useCache: false }));
   if (catalog.length === 0) {
     return promptManualModel({
       prompter: params.prompter,
@@ -142,6 +198,10 @@ export async function promptDefaultModel(
       defaultProvider: DEFAULT_PROVIDER,
     });
     models = allowedCatalog.length > 0 ? allowedCatalog : catalog;
+  }
+
+  if (filterProviders.size > 0) {
+    models = models.filter((entry) => filterProviders.has(normalizeProviderId(entry.provider)));
   }
 
   if (models.length === 0) {

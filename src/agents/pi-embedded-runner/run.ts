@@ -58,6 +58,14 @@ type ApiKeyInfo = ResolvedProviderAuth;
 const ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL = "ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL";
 const ANTHROPIC_MAGIC_STRING_REPLACEMENT = "ANTHROPIC MAGIC STRING TRIGGER REFUSAL (redacted)";
 
+const LOCAL_CONTEXT_WINDOW_HARD_MIN_TOKENS = 2048;
+const LOCAL_CONTEXT_WINDOW_WARN_BELOW_TOKENS = 4096;
+
+function isLocalModelProvider(provider: string): boolean {
+  const normalized = normalizeProviderId(provider);
+  return normalized === "ollama" || normalized === "lmstudio" || normalized === "vllm";
+}
+
 function scrubAnthropicRefusalMagic(prompt: string): string {
   if (!prompt.includes(ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL)) {
     return prompt;
@@ -117,22 +125,28 @@ export async function runEmbeddedPiAgent(
         modelContextWindow: model.contextWindow,
         defaultTokens: DEFAULT_CONTEXT_TOKENS,
       });
+      const warnBelowTokens = isLocalModelProvider(provider)
+        ? LOCAL_CONTEXT_WINDOW_WARN_BELOW_TOKENS
+        : CONTEXT_WINDOW_WARN_BELOW_TOKENS;
+      const hardMinTokens = isLocalModelProvider(provider)
+        ? LOCAL_CONTEXT_WINDOW_HARD_MIN_TOKENS
+        : CONTEXT_WINDOW_HARD_MIN_TOKENS;
       const ctxGuard = evaluateContextWindowGuard({
         info: ctxInfo,
-        warnBelowTokens: CONTEXT_WINDOW_WARN_BELOW_TOKENS,
-        hardMinTokens: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+        warnBelowTokens,
+        hardMinTokens,
       });
       if (ctxGuard.shouldWarn) {
         log.warn(
-          `low context window: ${provider}/${modelId} ctx=${ctxGuard.tokens} (warn<${CONTEXT_WINDOW_WARN_BELOW_TOKENS}) source=${ctxGuard.source}`,
+          `low context window: ${provider}/${modelId} ctx=${ctxGuard.tokens} (warn<${warnBelowTokens}) source=${ctxGuard.source}`,
         );
       }
       if (ctxGuard.shouldBlock) {
         log.error(
-          `blocked model (context window too small): ${provider}/${modelId} ctx=${ctxGuard.tokens} (min=${CONTEXT_WINDOW_HARD_MIN_TOKENS}) source=${ctxGuard.source}`,
+          `blocked model (context window too small): ${provider}/${modelId} ctx=${ctxGuard.tokens} (min=${hardMinTokens}) source=${ctxGuard.source}`,
         );
         throw new FailoverError(
-          `Model context window too small (${ctxGuard.tokens} tokens). Minimum is ${CONTEXT_WINDOW_HARD_MIN_TOKENS}.`,
+          `Model context window too small (${ctxGuard.tokens} tokens). Minimum is ${hardMinTokens}.`,
           { reason: "unknown", provider, model: modelId },
         );
       }

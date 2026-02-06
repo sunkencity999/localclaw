@@ -8,7 +8,7 @@ import {
   applyModelAllowlist,
   applyModelFallbacksFromSelection,
   applyPrimaryModel,
-  promptDefaultModel,
+  promptDefaultModelWithLocalOptions,
   promptModelAllowlist,
 } from "./model-picker.js";
 
@@ -61,17 +61,17 @@ export async function promptAuthConfig(
       setDefaultModel: true,
     });
     next = applied.config;
-  } else {
-    const modelSelection = await promptDefaultModel({
-      config: next,
-      prompter,
-      allowKeep: true,
-      ignoreAllowlist: true,
-      preferredProvider: resolvePreferredProviderForAuthChoice(authChoice),
-    });
-    if (modelSelection.model) {
-      next = applyPrimaryModel(next, modelSelection.model);
-    }
+  }
+
+  const modelSelection = await promptDefaultModelWithLocalOptions({
+    config: next,
+    prompter,
+    allowKeep: true,
+    ignoreAllowlist: true,
+    preferredProvider: resolvePreferredProviderForAuthChoice(authChoice),
+  });
+  if (modelSelection.model) {
+    next = applyPrimaryModel(next, modelSelection.model);
   }
 
   const anthropicOAuth =

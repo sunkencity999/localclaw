@@ -17,6 +17,13 @@ import { discoverVeniceModels, VENICE_BASE_URL } from "./venice-models.js";
 type ModelsConfig = NonNullable<OpenClawConfig["models"]>;
 export type ProviderConfig = NonNullable<ModelsConfig["providers"]>[string];
 
+type Env = Record<string, string | undefined>;
+
+function getEnv(): Env {
+  const proc = (globalThis as unknown as { process?: { env?: Env } }).process;
+  return proc?.env ?? {};
+}
+
 const MINIMAX_API_BASE_URL = "https://api.minimax.chat/v1";
 const MINIMAX_PORTAL_BASE_URL = "https://api.minimax.io/anthropic";
 const MINIMAX_DEFAULT_MODEL_ID = "MiniMax-M2.1";
@@ -67,14 +74,77 @@ const QWEN_PORTAL_DEFAULT_COST = {
 
 const OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
 const OLLAMA_API_BASE_URL = "http://127.0.0.1:11434";
-const OLLAMA_DEFAULT_CONTEXT_WINDOW = 128000;
-const OLLAMA_DEFAULT_MAX_TOKENS = 8192;
+const OLLAMA_DEFAULT_CONTEXT_WINDOW = 8192;
+const OLLAMA_DEFAULT_MAX_TOKENS = 2048;
 const OLLAMA_DEFAULT_COST = {
   input: 0,
   output: 0,
   cacheRead: 0,
   cacheWrite: 0,
 };
+
+const LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1";
+const VLLM_BASE_URL = "http://127.0.0.1:8000/v1";
+const LOCAL_OPENAI_DEFAULT_CONTEXT_WINDOW = 8192;
+const LOCAL_OPENAI_DEFAULT_MAX_TOKENS = 2048;
+
+function isLocalDiscoveryEnabled(): boolean {
+  const env = getEnv();
+  if (env.VITEST || env.NODE_ENV === "test") {
+    return env.OPENCLAW_TEST_ENABLE_LOCAL_DISCOVERY === "1";
+  }
+  return true;
+}
+
+async function isLocalOpenAiCompatibleServerReachable(baseUrl: string): Promise<boolean> {
+  if (!isLocalDiscoveryEnabled()) {
+    return false;
+  }
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(750),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+type OpenAiModelsResponse = {
+  data?: Array<{ id?: unknown }>;
+};
+
+async function discoverOpenAiCompatibleModels(baseUrl: string): Promise<ModelDefinitionConfig[]> {
+  if (!isLocalDiscoveryEnabled()) {
+    return [];
+  }
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = (await response.json()) as OpenAiModelsResponse;
+    const ids = Array.isArray(data.data)
+      ? data.data.map((m) => (typeof m?.id === "string" ? m.id.trim() : "")).filter(Boolean)
+      : [];
+    if (ids.length === 0) {
+      return [];
+    }
+    return ids.map((id) => ({
+      id,
+      name: id,
+      reasoning: false,
+      input: ["text"],
+      cost: OLLAMA_DEFAULT_COST,
+      contextWindow: LOCAL_OPENAI_DEFAULT_CONTEXT_WINDOW,
+      maxTokens: LOCAL_OPENAI_DEFAULT_MAX_TOKENS,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 interface OllamaModel {
   name: string;
@@ -92,8 +162,7 @@ interface OllamaTagsResponse {
 }
 
 async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
-  // Skip Ollama discovery in test environments
-  if (process.env.VITEST || process.env.NODE_ENV === "test") {
+  if (!isLocalDiscoveryEnabled()) {
     return [];
   }
   try {
@@ -126,6 +195,20 @@ async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
   } catch (error) {
     console.warn(`Failed to discover Ollama models: ${String(error)}`);
     return [];
+  }
+}
+
+async function isOllamaReachable(): Promise<boolean> {
+  if (!isLocalDiscoveryEnabled()) {
+    return false;
+  }
+  try {
+    const response = await fetch(`${OLLAMA_API_BASE_URL}/api/tags`, {
+      signal: AbortSignal.timeout(750),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -394,6 +477,24 @@ async function buildOllamaProvider(): Promise<ProviderConfig> {
   };
 }
 
+async function buildLmStudioProvider(): Promise<ProviderConfig> {
+  const models = await discoverOpenAiCompatibleModels(LMSTUDIO_BASE_URL);
+  return {
+    baseUrl: LMSTUDIO_BASE_URL,
+    api: "openai-completions",
+    models,
+  };
+}
+
+async function buildVllmProvider(): Promise<ProviderConfig> {
+  const models = await discoverOpenAiCompatibleModels(VLLM_BASE_URL);
+  return {
+    baseUrl: VLLM_BASE_URL,
+    api: "openai-completions",
+    models,
+  };
+}
+
 export async function resolveImplicitProviders(params: {
   agentDir: string;
 }): Promise<ModelsConfig["providers"]> {
@@ -453,12 +554,29 @@ export async function resolveImplicitProviders(params: {
     providers.xiaomi = { ...buildXiaomiProvider(), apiKey: xiaomiKey };
   }
 
-  // Ollama provider - only add if explicitly configured
+  // Local providers (no real API keys required; use a placeholder key).
   const ollamaKey =
     resolveEnvApiKeyVarName("ollama") ??
     resolveApiKeyFromProfiles({ provider: "ollama", store: authStore });
-  if (ollamaKey) {
-    providers.ollama = { ...(await buildOllamaProvider()), apiKey: ollamaKey };
+  if (ollamaKey || (await isOllamaReachable())) {
+    const provider = await buildOllamaProvider();
+    if (provider.models.length > 0) {
+      providers.ollama = { ...provider, apiKey: ollamaKey ?? "ollama" };
+    }
+  }
+
+  if (await isLocalOpenAiCompatibleServerReachable(LMSTUDIO_BASE_URL)) {
+    const provider = await buildLmStudioProvider();
+    if (provider.models.length > 0) {
+      providers.lmstudio = { ...provider, apiKey: "local" };
+    }
+  }
+
+  if (await isLocalOpenAiCompatibleServerReachable(VLLM_BASE_URL)) {
+    const provider = await buildVllmProvider();
+    if (provider.models.length > 0) {
+      providers.vllm = { ...provider, apiKey: "local" };
+    }
   }
 
   return providers;
@@ -466,9 +584,9 @@ export async function resolveImplicitProviders(params: {
 
 export async function resolveImplicitCopilotProvider(params: {
   agentDir: string;
-  env?: NodeJS.ProcessEnv;
+  env?: Env;
 }): Promise<ProviderConfig | null> {
-  const env = params.env ?? process.env;
+  const env = params.env ?? getEnv();
   const authStore = ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false });
   const hasProfile = listProfilesForProvider(authStore, "github-copilot").length > 0;
   const envToken = env.COPILOT_GITHUB_TOKEN ?? env.GH_TOKEN ?? env.GITHUB_TOKEN;
@@ -526,9 +644,9 @@ export async function resolveImplicitCopilotProvider(params: {
 export async function resolveImplicitBedrockProvider(params: {
   agentDir: string;
   config?: OpenClawConfig;
-  env?: NodeJS.ProcessEnv;
+  env?: Env;
 }): Promise<ProviderConfig | null> {
-  const env = params.env ?? process.env;
+  const env = params.env ?? getEnv();
   const discoveryConfig = params.config?.models?.bedrockDiscovery;
   const enabled = discoveryConfig?.enabled;
   const hasAwsCreds = resolveAwsSdkEnvVarName(env) !== undefined;

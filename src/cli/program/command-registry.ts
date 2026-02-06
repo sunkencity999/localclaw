@@ -8,6 +8,7 @@ import { defaultRuntime } from "../../runtime.js";
 import { getFlagValue, getPositiveIntFlagValue, getVerboseFlag, hasFlag } from "../argv.js";
 import { registerBrowserCli } from "../browser-cli.js";
 import { registerConfigCli } from "../config-cli.js";
+import { registerLocalCli } from "../local-cli.js";
 import { registerMemoryCli, runMemoryStatus } from "../memory-cli.js";
 import { registerAgentCommands } from "./register.agent.js";
 import { registerConfigureCommand } from "./register.configure.js";
@@ -116,6 +117,10 @@ export const commandRegistry: CommandRegistration[] = [
   {
     id: "setup",
     register: ({ program }) => registerSetupCommand(program),
+  },
+  {
+    id: "local",
+    register: ({ program }) => registerLocalCli(program),
   },
   {
     id: "onboard",

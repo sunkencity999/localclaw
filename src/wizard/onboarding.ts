@@ -17,7 +17,7 @@ import {
   resolvePreferredProviderForAuthChoice,
   warnIfModelConfigLooksOff,
 } from "../commands/auth-choice.js";
-import { applyPrimaryModel, promptDefaultModel } from "../commands/model-picker.js";
+import { applyPrimaryModel, promptDefaultModelWithLocalOptions } from "../commands/model-picker.js";
 import { setupChannels } from "../commands/onboard-channels.js";
 import {
   applyWizardMetadata,
@@ -393,7 +393,7 @@ export async function runOnboardingWizard(
   nextConfig = authResult.config;
 
   if (authChoiceFromPrompt) {
-    const modelSelection = await promptDefaultModel({
+    const modelSelection = await promptDefaultModelWithLocalOptions({
       config: nextConfig,
       prompter,
       allowKeep: true,

@@ -41,6 +41,15 @@ Model note: while any model is supported, I strongly recommend **Anthropic Pro/M
 - Models config + CLI: [Models](https://docs.openclaw.ai/concepts/models)
 - Auth profile rotation (OAuth vs API keys) + fallbacks: [Model failover](https://docs.openclaw.ai/concepts/model-failover)
 
+Local models:
+
+- `openclaw onboard` and `openclaw configure` can detect local model servers and let you pick a model from a list.
+- Default local endpoints:
+  - Ollama: `http://127.0.0.1:11434/v1`
+  - LM Studio: `http://127.0.0.1:1234/v1`
+  - vLLM: `http://127.0.0.1:8000/v1`
+- Setup details: [Model Providers](https://docs.openclaw.ai/concepts/model-providers)
+
 ## Install (recommended)
 
 Runtime: **Node ≥22**.

@@ -4,9 +4,14 @@ import {
   applyModelAllowlist,
   applyModelFallbacksFromSelection,
   promptDefaultModel,
+  promptDefaultModelWithLocalOptions,
   promptModelAllowlist,
 } from "./model-picker.js";
 import { makePrompter } from "./onboarding/__tests__/test-utils.js";
+
+type SelectOption = { value: string; label?: string; hint?: string };
+type SelectParams = { message?: string; options: SelectOption[] };
+type MultiSelectParams = { message?: string; options: Array<{ value: string }> };
 
 const loadModelCatalog = vi.hoisted(() => vi.fn());
 vi.mock("../agents/model-catalog.js", () => ({
@@ -47,7 +52,7 @@ describe("promptDefaultModel", () => {
       },
     ]);
 
-    const select = vi.fn(async (params) => {
+    const select = vi.fn(async (params: SelectParams) => {
       const first = params.options[0];
       return first?.value ?? "";
     });
@@ -62,11 +67,104 @@ describe("promptDefaultModel", () => {
       ignoreAllowlist: true,
     });
 
-    const options = select.mock.calls[0]?.[0]?.options ?? [];
-    expect(options.some((opt) => opt.value === "openrouter/auto")).toBe(false);
-    expect(options.some((opt) => opt.value === "openrouter/meta-llama/llama-3.3-70b:free")).toBe(
-      true,
-    );
+    const options: SelectOption[] =
+      (select.mock.calls[0]?.[0] as SelectParams | undefined)?.options ?? [];
+    expect(options.some((opt: SelectOption) => opt.value === "openrouter/auto")).toBe(false);
+    expect(
+      options.some((opt: SelectOption) => opt.value === "openrouter/meta-llama/llama-3.3-70b:free"),
+    ).toBe(true);
+  });
+});
+
+describe("promptDefaultModelWithLocalOptions", () => {
+  it("can filter to local models when local models are detected", async () => {
+    loadModelCatalog.mockResolvedValue([
+      {
+        provider: "ollama",
+        id: "llama3.2:3b",
+        name: "Llama 3.2 3B",
+      },
+      {
+        provider: "anthropic",
+        id: "claude-opus-4-5",
+        name: "Claude Opus 4.5",
+      },
+    ]);
+
+    const select = vi.fn(async (params: SelectParams) => {
+      if (params.message === "Default model source") {
+        return "local";
+      }
+      const first = params.options[0];
+      return first?.value ?? "";
+    });
+    const prompter = makePrompter({ select });
+    const config = { agents: { defaults: {} } } as OpenClawConfig;
+
+    await promptDefaultModelWithLocalOptions({
+      config,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+    });
+
+    const modelSelectCall = select.mock.calls.find((call: unknown[]) => {
+      const params = call[0] as SelectParams | undefined;
+      return params?.message === "Default local model";
+    });
+    const modelSelectParams: SelectParams | undefined = modelSelectCall?.[0];
+    const options: SelectOption[] = modelSelectParams?.options ?? [];
+
+    expect(options.some((opt: { value: string }) => opt.value === "ollama/llama3.2:3b")).toBe(true);
+    expect(
+      options.some((opt: { value: string }) => opt.value === "anthropic/claude-opus-4-5"),
+    ).toBe(false);
+  });
+
+  it("falls back to all models when selected", async () => {
+    loadModelCatalog.mockResolvedValue([
+      {
+        provider: "ollama",
+        id: "llama3.2:3b",
+        name: "Llama 3.2 3B",
+      },
+      {
+        provider: "anthropic",
+        id: "claude-opus-4-5",
+        name: "Claude Opus 4.5",
+      },
+    ]);
+
+    const select = vi.fn(async (params: SelectParams) => {
+      if (params.message === "Default model source") {
+        return "all";
+      }
+      const first = params.options[0];
+      return first?.value ?? "";
+    });
+    const prompter = makePrompter({ select });
+    const config = { agents: { defaults: {} } } as OpenClawConfig;
+
+    await promptDefaultModelWithLocalOptions({
+      config,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+    });
+
+    const modelSelectCall = select.mock.calls.find((call: unknown[]) => {
+      const params = call[0] as SelectParams | undefined;
+      return params?.message === "Default model";
+    });
+    const modelSelectParams: SelectParams | undefined = modelSelectCall?.[0];
+    const options: SelectOption[] = modelSelectParams?.options ?? [];
+
+    expect(options.some((opt: { value: string }) => opt.value === "ollama/llama3.2:3b")).toBe(true);
+    expect(
+      options.some((opt: { value: string }) => opt.value === "anthropic/claude-opus-4-5"),
+    ).toBe(true);
   });
 });
 
@@ -85,7 +183,7 @@ describe("promptModelAllowlist", () => {
       },
     ]);
 
-    const multiselect = vi.fn(async (params) =>
+    const multiselect = vi.fn(async (params: MultiSelectParams) =>
       params.options.map((option: { value: string }) => option.value),
     );
     const prompter = makePrompter({ multiselect });
@@ -121,7 +219,7 @@ describe("promptModelAllowlist", () => {
       },
     ]);
 
-    const multiselect = vi.fn(async (params) =>
+    const multiselect = vi.fn(async (params: MultiSelectParams) =>
       params.options.map((option: { value: string }) => option.value),
     );
     const prompter = makePrompter({ multiselect });
