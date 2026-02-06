@@ -59,7 +59,7 @@ export type MatrixMediaInfo =
 
 export type MatrixTextContent = TextualMessageEventContent & MatrixReplyMeta;
 
-export type MatrixMediaContent = MessageEventContent &
+export type MatrixMediaContent = Omit<MessageEventContent, keyof TextualMessageEventContent> &
   MatrixReplyMeta & {
     info?: MatrixMediaInfo;
     url?: string;
