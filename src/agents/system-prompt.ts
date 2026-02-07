@@ -208,6 +208,8 @@ export function buildAgentSystemPrompt(params: {
       defaultLevel: "on" | "off" | "ask" | "full";
     };
   };
+  /** Skip the Silent Replies (NO_REPLY) section — useful for local models that misuse it. */
+  skipSilentReplies?: boolean;
   /** Reaction guidance for the agent (for Telegram minimal/extensive modes). */
   reactionGuidance?: {
     level: "minimal" | "extensive";
@@ -551,8 +553,8 @@ export function buildAgentSystemPrompt(params: {
     }
   }
 
-  // Skip silent replies for subagent/none modes
-  if (!isMinimal) {
+  // Skip silent replies for subagent/none modes or when explicitly disabled (e.g. local gateway)
+  if (!isMinimal && !params.skipSilentReplies) {
     lines.push(
       "## Silent Replies",
       `When you have nothing to say, respond with ONLY: ${SILENT_REPLY_TOKEN}`,

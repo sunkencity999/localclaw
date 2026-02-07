@@ -336,9 +336,7 @@ export async function runEmbeddedAttempt(
       },
     });
     const isDefaultAgent = sessionAgentId === defaultAgentId;
-    const isLocalGateway = params.config?.gateway?.mode === "local";
-    const promptMode =
-      isSubagentSessionKey(params.sessionKey) || isLocalGateway ? "minimal" : "full";
+    const promptMode = isSubagentSessionKey(params.sessionKey) ? "minimal" : "full";
     const docsPath = await resolveOpenClawDocsPath({
       workspaceDir: effectiveWorkspace,
       argv1: process.argv[1],
@@ -373,6 +371,7 @@ export async function runEmbeddedAttempt(
       runtimeInfo,
       messageToolHints,
       sandboxInfo,
+      skipSilentReplies: params.config?.gateway?.mode === "local",
       tools,
       modelAliasLines: buildModelAliasLines(params.config),
       userTimezone,

@@ -40,6 +40,8 @@ export function buildEmbeddedSystemPrompt(params: {
   };
   messageToolHints?: string[];
   sandboxInfo?: EmbeddedSandboxInfo;
+  /** Skip the Silent Replies (NO_REPLY) section for local models. */
+  skipSilentReplies?: boolean;
   tools: AgentTool[];
   modelAliasLines: string[];
   userTimezone: string;
@@ -64,6 +66,7 @@ export function buildEmbeddedSystemPrompt(params: {
     runtimeInfo: params.runtimeInfo,
     messageToolHints: params.messageToolHints,
     sandboxInfo: params.sandboxInfo,
+    skipSilentReplies: params.skipSilentReplies,
     toolNames: params.tools.map((tool) => tool.name),
     toolSummaries: buildToolSummaryMap(params.tools),
     modelAliasLines: params.modelAliasLines,
