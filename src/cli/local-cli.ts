@@ -98,7 +98,6 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
     },
     session: {
       ...cfg.session,
-      mainKey: "local",
     },
   };
 }
