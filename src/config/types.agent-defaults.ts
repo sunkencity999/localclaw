@@ -24,7 +24,7 @@ export type AgentModelListConfig = {
 };
 
 export type AgentContextPruningConfig = {
-  mode?: "off" | "cache-ttl";
+  mode?: "off" | "cache-ttl" | "always";
   /** TTL to consider cache expired (duration string, default unit: minutes). */
   ttl?: string;
   keepLastAssistants?: number;
@@ -255,6 +255,12 @@ export type AgentCompactionMemoryFlushConfig = {
   enabled?: boolean;
   /** Run the memory flush when context is within this many tokens of the compaction threshold. */
   softThresholdTokens?: number;
+  /**
+   * Flush memories every N compaction cycles (proactive, not just pre-compaction).
+   * When set, a memory flush runs after every N compactions even if the token threshold
+   * has not been reached. Useful for small-context local models. Default: disabled (0).
+   */
+  compactionInterval?: number;
   /** User prompt used for the memory flush turn (NO_REPLY is enforced if missing). */
   prompt?: string;
   /** System prompt appended for the memory flush turn. */

@@ -23,6 +23,54 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
       ? cfg.gateway.port
       : DEFAULT_GATEWAY_PORT;
   const port = basePort === DEFAULT_GATEWAY_PORT ? DEFAULT_GATEWAY_PORT + 1 : basePort;
+
+  // --- Aggressive context management for small local models ---
+
+  // Context pruning: "always" mode prunes every turn (no cache-ttl gating).
+  // Lower thresholds so pruning kicks in early and tool results are trimmed aggressively.
+  const contextPruning = {
+    mode: "always" as const,
+    keepLastAssistants: 2,
+    softTrimRatio: 0.2,
+    hardClearRatio: 0.4,
+    minPrunableToolChars: 10_000,
+    softTrim: {
+      maxChars: 2_000,
+      headChars: 800,
+      tailChars: 800,
+    },
+    hardClear: {
+      enabled: true,
+      placeholder: "[Tool result cleared to save context]",
+    },
+    ...defaults.contextPruning,
+  };
+
+  // Compaction: safeguard mode with a smaller history share so more room is
+  // left for the current task. Lower reserve tokens floor for small windows.
+  const compaction = {
+    mode: "safeguard" as const,
+    reserveTokensFloor: 2_000,
+    maxHistoryShare: 0.3,
+    memoryFlush: {
+      enabled: true,
+      softThresholdTokens: 2_000,
+      compactionInterval: 1,
+      ...defaults.compaction?.memoryFlush,
+    },
+    ...defaults.compaction,
+  };
+  // Ensure nested memoryFlush isn't overwritten by the spread above
+  compaction.memoryFlush = {
+    enabled: true,
+    softThresholdTokens: 2_000,
+    compactionInterval: 1,
+    ...defaults.compaction?.memoryFlush,
+  };
+
+  // Lower bootstrap max chars to reduce system prompt size for small context windows.
+  const bootstrapMaxChars = defaults.bootstrapMaxChars ?? 8_000;
+
   return {
     ...cfg,
     agents: {
@@ -30,6 +78,9 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
       defaults: {
         ...defaults,
         workspace,
+        contextPruning,
+        compaction,
+        bootstrapMaxChars,
       },
     },
     gateway: {

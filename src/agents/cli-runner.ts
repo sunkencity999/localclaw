@@ -28,6 +28,10 @@ import {
 } from "./cli-runner/helpers.js";
 import { resolveOpenClawDocsPath } from "./docs-path.js";
 import { FailoverError, resolveFailoverStatus } from "./failover-error.js";
+import {
+  LOCAL_CONTEXT_SYSTEM_PROMPT,
+  shouldInjectLocalContextInstructions,
+} from "./local-context-instructions.js";
 import { classifyFailoverReason, isFailoverErrorMessage } from "./pi-embedded-helpers.js";
 
 const log = createSubsystemLogger("agent/claude-cli");
@@ -63,7 +67,11 @@ export async function runCliAgent(params: {
   const normalizedModel = normalizeCliModel(modelId, backend);
   const modelDisplay = `${params.provider}/${modelId}`;
 
+  const localContextExtra = shouldInjectLocalContextInstructions(params.config)
+    ? LOCAL_CONTEXT_SYSTEM_PROMPT
+    : undefined;
   const extraSystemPrompt = [
+    localContextExtra,
     params.extraSystemPrompt?.trim(),
     "Tools are disabled in this session. Do not call tools.",
   ]

@@ -4,7 +4,7 @@ export type ContextPruningToolMatch = {
   allow?: string[];
   deny?: string[];
 };
-export type ContextPruningMode = "off" | "cache-ttl";
+export type ContextPruningMode = "off" | "cache-ttl" | "always";
 
 export type ContextPruningConfig = {
   mode?: ContextPruningMode;
@@ -28,6 +28,8 @@ export type ContextPruningConfig = {
 
 export type EffectiveContextPruningSettings = {
   mode: Exclude<ContextPruningMode, "off">;
+  /** When true, pruning runs every turn regardless of provider or cache TTL. */
+  alwaysPrune: boolean;
   ttlMs: number;
   keepLastAssistants: number;
   softTrimRatio: number;
@@ -47,6 +49,7 @@ export type EffectiveContextPruningSettings = {
 
 export const DEFAULT_CONTEXT_PRUNING_SETTINGS: EffectiveContextPruningSettings = {
   mode: "cache-ttl",
+  alwaysPrune: false,
   ttlMs: 5 * 60 * 1000,
   keepLastAssistants: 3,
   softTrimRatio: 0.3,
@@ -69,12 +72,13 @@ export function computeEffectiveSettings(raw: unknown): EffectiveContextPruningS
     return null;
   }
   const cfg = raw as ContextPruningConfig;
-  if (cfg.mode !== "cache-ttl") {
+  if (cfg.mode !== "cache-ttl" && cfg.mode !== "always") {
     return null;
   }
 
   const s: EffectiveContextPruningSettings = structuredClone(DEFAULT_CONTEXT_PRUNING_SETTINGS);
   s.mode = cfg.mode;
+  s.alwaysPrune = cfg.mode === "always";
 
   if (typeof cfg.ttl === "string") {
     try {

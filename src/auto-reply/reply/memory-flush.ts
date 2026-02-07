@@ -22,6 +22,11 @@ export const DEFAULT_MEMORY_FLUSH_SYSTEM_PROMPT = [
 export type MemoryFlushSettings = {
   enabled: boolean;
   softThresholdTokens: number;
+  /**
+   * Flush memories every N compaction cycles, independent of token threshold.
+   * 0 or undefined = disabled (only token-threshold flush). Default: 0.
+   */
+  compactionInterval: number;
   prompt: string;
   systemPrompt: string;
   reserveTokensFloor: number;
@@ -49,9 +54,12 @@ export function resolveMemoryFlushSettings(cfg?: OpenClawConfig): MemoryFlushSet
     normalizeNonNegativeInt(cfg?.agents?.defaults?.compaction?.reserveTokensFloor) ??
     DEFAULT_PI_COMPACTION_RESERVE_TOKENS_FLOOR;
 
+  const compactionInterval = normalizeNonNegativeInt(defaults?.compactionInterval) ?? 0;
+
   return {
     enabled,
     softThresholdTokens,
+    compactionInterval,
     prompt: ensureNoReplyHint(prompt),
     systemPrompt: ensureNoReplyHint(systemPrompt),
     reserveTokensFloor,
@@ -79,7 +87,26 @@ export function shouldRunMemoryFlush(params: {
   contextWindowTokens: number;
   reserveTokensFloor: number;
   softThresholdTokens: number;
+  compactionInterval?: number;
 }): boolean {
+  const compactionCount = params.entry?.compactionCount ?? 0;
+  const lastFlushAt = params.entry?.memoryFlushCompactionCount;
+
+  // Already flushed at this compaction count — skip.
+  if (typeof lastFlushAt === "number" && lastFlushAt === compactionCount) {
+    return false;
+  }
+
+  // Proactive interval-based flush: trigger every N compactions regardless of token count.
+  const interval = params.compactionInterval ?? 0;
+  if (interval > 0 && compactionCount > 0) {
+    const lastFlush = typeof lastFlushAt === "number" ? lastFlushAt : 0;
+    if (compactionCount - lastFlush >= interval) {
+      return true;
+    }
+  }
+
+  // Token-threshold flush (original behavior).
   const totalTokens = params.entry?.totalTokens;
   if (!totalTokens || totalTokens <= 0) {
     return false;
@@ -92,12 +119,6 @@ export function shouldRunMemoryFlush(params: {
     return false;
   }
   if (totalTokens < threshold) {
-    return false;
-  }
-
-  const compactionCount = params.entry?.compactionCount ?? 0;
-  const lastFlushAt = params.entry?.memoryFlushCompactionCount;
-  if (typeof lastFlushAt === "number" && lastFlushAt === compactionCount) {
     return false;
   }
 

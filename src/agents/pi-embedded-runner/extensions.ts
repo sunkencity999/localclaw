@@ -43,10 +43,11 @@ function buildContextPruningExtension(params: {
   model: Model<Api> | undefined;
 }): { additionalExtensionPaths?: string[] } {
   const raw = params.cfg?.agents?.defaults?.contextPruning;
-  if (raw?.mode !== "cache-ttl") {
+  if (raw?.mode !== "cache-ttl" && raw?.mode !== "always") {
     return {};
   }
-  if (!isCacheTtlEligibleProvider(params.provider, params.modelId)) {
+  // "always" mode skips the provider eligibility check (works with any provider, including local)
+  if (raw.mode === "cache-ttl" && !isCacheTtlEligibleProvider(params.provider, params.modelId)) {
     return {};
   }
 

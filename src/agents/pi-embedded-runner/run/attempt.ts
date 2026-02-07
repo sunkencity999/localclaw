@@ -29,6 +29,10 @@ import {
 } from "../../channel-tools.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
+import {
+  LOCAL_CONTEXT_SYSTEM_PROMPT,
+  shouldInjectLocalContextInstructions,
+} from "../../local-context-instructions.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { resolveDefaultModelForAgent } from "../../model-selection.js";
 import {
@@ -341,11 +345,18 @@ export async function runEmbeddedAttempt(
     });
     const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
 
+    // Inject local-context strategy instructions for small local models
+    const localContextExtra = shouldInjectLocalContextInstructions(params.config)
+      ? LOCAL_CONTEXT_SYSTEM_PROMPT
+      : undefined;
+    const composedExtraSystemPrompt =
+      [localContextExtra, params.extraSystemPrompt].filter(Boolean).join("\n\n") || undefined;
+
     const appendPrompt = buildEmbeddedSystemPrompt({
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
-      extraSystemPrompt: params.extraSystemPrompt,
+      extraSystemPrompt: composedExtraSystemPrompt,
       ownerNumbers: params.ownerNumbers,
       reasoningTagHint,
       heartbeatPrompt: isDefaultAgent
