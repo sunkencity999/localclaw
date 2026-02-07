@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_AGENT_WORKSPACE_DIR } from "../agents/workspace.js";
 import {
   applyPrimaryModel,
   LOCAL_MODEL_PROVIDERS,
@@ -9,13 +8,22 @@ import {
 import { ensureWorkspaceAndSessions } from "../commands/onboard-helpers.js";
 import { writeConfigFile, type OpenClawConfig } from "../config/config.js";
 import { logConfigUpdated } from "../config/logging.js";
+import { resolveStateDir } from "../config/paths.js";
 import { DEFAULT_GATEWAY_PORT } from "../config/paths.js";
 import { defaultRuntime } from "../runtime.js";
 import { createClackPrompter } from "../wizard/clack-prompter.js";
 
 function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
   const defaults = cfg.agents?.defaults ?? {};
-  const workspace = defaults.workspace ?? DEFAULT_AGENT_WORKSPACE_DIR;
+
+  // Workspace must live under the localclaw state dir, not ~/.openclaw/.
+  // Override any migrated workspace that still points into .openclaw.
+  const stateDir = resolveStateDir();
+  const defaultLocalWorkspace = path.join(stateDir, "workspace");
+  const workspace =
+    defaults.workspace && !defaults.workspace.includes("/.openclaw/")
+      ? defaults.workspace
+      : defaultLocalWorkspace;
   const basePort =
     typeof cfg.gateway?.port === "number" &&
     Number.isFinite(cfg.gateway.port) &&
@@ -90,7 +98,7 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
     },
     session: {
       ...cfg.session,
-      mainKey: cfg.session?.mainKey ?? "local",
+      mainKey: "local",
     },
   };
 }
@@ -123,7 +131,8 @@ export async function runLocalOnboarding(params: { configPath: string }): Promis
   await writeConfigFile(next);
   logConfigUpdated(defaultRuntime, { path: params.configPath });
 
-  const workspaceDir = next.agents?.defaults?.workspace ?? DEFAULT_AGENT_WORKSPACE_DIR;
+  const workspaceDir =
+    next.agents?.defaults?.workspace ?? path.join(resolveStateDir(), "workspace");
   await fs.promises
     .mkdir(path.dirname(params.configPath), { recursive: true, mode: 0o700 })
     .catch(() => {
