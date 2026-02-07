@@ -14,12 +14,12 @@
 
 **LocalClaw** is a local-first personal AI assistant CLI built on [OpenClaw](https://github.com/openclaw/openclaw). It gives you the full power of the OpenClaw agent runtime — gateway, tools, sessions, skills — but defaults to **local model providers** like Ollama, LM Studio, and vLLM. No cloud keys required to get started.
 
-> **Coexistence:** LocalClaw installs as a separate `localclaw` binary with its own config file (`~/.openclaw/openclaw.local.json`) and profile. It runs side-by-side with a standard `openclaw` installation without any interference. Different config, different gateway port, same machine.
+> **Coexistence:** LocalClaw installs as a separate `localclaw` binary with its own state directory (`~/.localclaw/`) and config file (`~/.localclaw/openclaw.local.json`). It runs side-by-side with a standard `openclaw` installation without any interference. Different state directory, different config, different gateway port, same machine.
 
 ## Why LocalClaw?
 
 - **Zero cloud dependency** — point it at Ollama, LM Studio, or vLLM and go.
-- **Isolated config** — `~/.openclaw/openclaw.local.json` keeps your local setup separate from any existing OpenClaw config.
+- **Isolated state** — `~/.localclaw/` keeps sessions, locks, and agent data fully separate from any existing OpenClaw installation.
 - **First-run onboarding** — detects local model servers and walks you through picking a default model.
 - **Full OpenClaw feature set** — gateway, TUI, agent, browser control, skills, sessions, tools — all via `localclaw <command>`.
 - **Separate gateway port** — defaults to port `18790` so it doesn't conflict with an OpenClaw gateway on `18789`.
@@ -63,7 +63,7 @@ The agent automatically breaks complex tasks into discrete steps, persisting pla
 
 ### Tuning (optional)
 
-The defaults work well out of the box, but you can override any setting in `~/.openclaw/openclaw.local.json`:
+The defaults work well out of the box, but you can override any setting in `~/.localclaw/openclaw.local.json`:
 
 ```json5
 {
@@ -153,7 +153,7 @@ localclaw doctor
 
 ## Configuration
 
-LocalClaw stores its config at `~/.openclaw/openclaw.local.json`. Minimal example:
+LocalClaw stores its config at `~/.localclaw/openclaw.local.json`. Minimal example:
 
 ```json5
 {
@@ -198,12 +198,12 @@ LocalClaw is designed to run alongside a standard OpenClaw installation:
 | | OpenClaw | LocalClaw |
 |---|---|---|
 | **Binary** | `openclaw` | `localclaw` |
-| **Config file** | `~/.openclaw/openclaw.json` | `~/.openclaw/openclaw.local.json` |
+| **Config file** | `~/.openclaw/openclaw.json` | `~/.localclaw/openclaw.local.json` |
 | **Profile** | (default) | `local` |
 | **Gateway port** | `18789` | `18790` |
-| **State directory** | `~/.openclaw` | `~/.openclaw` (shared) |
+| **State directory** | `~/.openclaw/` | `~/.localclaw/` |
 
-Both can be installed globally and run simultaneously. They share the same state directory (`~/.openclaw`) for workspace, sessions, and credentials, but maintain separate configs and gateway instances.
+Both can be installed globally and run simultaneously. They use completely separate state directories, configs, sessions, and gateway instances — no shared locks or files.
 
 ## All OpenClaw features included
 
