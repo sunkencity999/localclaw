@@ -163,10 +163,17 @@ interface OllamaTagsResponse {
 
 interface OllamaShowResponse {
   model_info?: Record<string, unknown>;
+  capabilities?: string[];
 }
 
-/** Query the real context window for a single Ollama model via /api/show. */
-async function fetchOllamaContextWindow(modelName: string): Promise<number | null> {
+interface OllamaModelInfo {
+  contextWindow: number | null;
+  thinking: boolean;
+}
+
+/** Query model metadata from Ollama /api/show (context window + capabilities). */
+async function fetchOllamaModelInfo(modelName: string): Promise<OllamaModelInfo> {
+  const fallback: OllamaModelInfo = { contextWindow: null, thinking: false };
   try {
     const res = await fetch(`${OLLAMA_API_BASE_URL}/api/show`, {
       method: "POST",
@@ -174,19 +181,25 @@ async function fetchOllamaContextWindow(modelName: string): Promise<number | nul
       body: JSON.stringify({ name: modelName }),
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return fallback;
     const data = (await res.json()) as OllamaShowResponse;
+
+    let contextWindow: number | null = null;
     const info = data.model_info;
-    if (!info) return null;
-    // The key is "<arch>.context_length", e.g. "llama.context_length".
-    for (const [key, value] of Object.entries(info)) {
-      if (key.endsWith(".context_length") && typeof value === "number" && value > 0) {
-        return value;
+    if (info) {
+      // The key is "<arch>.context_length", e.g. "llama.context_length".
+      for (const [key, value] of Object.entries(info)) {
+        if (key.endsWith(".context_length") && typeof value === "number" && value > 0) {
+          contextWindow = value;
+          break;
+        }
       }
     }
-    return null;
+
+    const thinking = Array.isArray(data.capabilities) && data.capabilities.includes("thinking");
+    return { contextWindow, thinking };
   } catch {
-    return null;
+    return fallback;
   }
 }
 
@@ -210,10 +223,12 @@ async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
     const results = await Promise.all(
       data.models.map(async (model) => {
         const modelId = model.name;
+        const modelInfo = await fetchOllamaModelInfo(modelId);
         const isReasoning =
-          modelId.toLowerCase().includes("r1") || modelId.toLowerCase().includes("reasoning");
-        const contextWindow =
-          (await fetchOllamaContextWindow(modelId)) ?? OLLAMA_DEFAULT_CONTEXT_WINDOW;
+          modelInfo.thinking ||
+          modelId.toLowerCase().includes("r1") ||
+          modelId.toLowerCase().includes("reasoning");
+        const contextWindow = modelInfo.contextWindow ?? OLLAMA_DEFAULT_CONTEXT_WINDOW;
         return {
           id: modelId,
           name: modelId,
