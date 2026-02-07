@@ -89,6 +89,8 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
         contextPruning,
         compaction,
         bootstrapMaxChars,
+        // Local models are slower; give them more time per turn.
+        timeoutSeconds: defaults.timeoutSeconds ?? 180,
       },
     },
     gateway: {
