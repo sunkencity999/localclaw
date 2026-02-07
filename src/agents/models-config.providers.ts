@@ -161,6 +161,35 @@ interface OllamaTagsResponse {
   models: OllamaModel[];
 }
 
+interface OllamaShowResponse {
+  model_info?: Record<string, unknown>;
+}
+
+/** Query the real context window for a single Ollama model via /api/show. */
+async function fetchOllamaContextWindow(modelName: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${OLLAMA_API_BASE_URL}/api/show`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: modelName }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as OllamaShowResponse;
+    const info = data.model_info;
+    if (!info) return null;
+    // The key is "<arch>.context_length", e.g. "llama.context_length".
+    for (const [key, value] of Object.entries(info)) {
+      if (key.endsWith(".context_length") && typeof value === "number" && value > 0) {
+        return value;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
   if (!isLocalDiscoveryEnabled()) {
     return [];
@@ -178,20 +207,25 @@ async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
       console.warn("No Ollama models found on local instance");
       return [];
     }
-    return data.models.map((model) => {
-      const modelId = model.name;
-      const isReasoning =
-        modelId.toLowerCase().includes("r1") || modelId.toLowerCase().includes("reasoning");
-      return {
-        id: modelId,
-        name: modelId,
-        reasoning: isReasoning,
-        input: ["text"],
-        cost: OLLAMA_DEFAULT_COST,
-        contextWindow: OLLAMA_DEFAULT_CONTEXT_WINDOW,
-        maxTokens: OLLAMA_DEFAULT_MAX_TOKENS,
-      };
-    });
+    const results = await Promise.all(
+      data.models.map(async (model) => {
+        const modelId = model.name;
+        const isReasoning =
+          modelId.toLowerCase().includes("r1") || modelId.toLowerCase().includes("reasoning");
+        const contextWindow =
+          (await fetchOllamaContextWindow(modelId)) ?? OLLAMA_DEFAULT_CONTEXT_WINDOW;
+        return {
+          id: modelId,
+          name: modelId,
+          reasoning: isReasoning,
+          input: ["text"] as ("text" | "image")[],
+          cost: OLLAMA_DEFAULT_COST,
+          contextWindow,
+          maxTokens: OLLAMA_DEFAULT_MAX_TOKENS,
+        };
+      }),
+    );
+    return results;
   } catch (error) {
     console.warn(`Failed to discover Ollama models: ${String(error)}`);
     return [];
