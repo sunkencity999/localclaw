@@ -112,7 +112,8 @@ export class GatewayChatClient {
       token: resolved.token,
       password: resolved.password,
       clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
-      clientDisplayName: "openclaw-tui",
+      clientDisplayName:
+        process.env.OPENCLAW_PROFILE === "local" ? "localclaw-tui" : "openclaw-tui",
       clientVersion: VERSION,
       platform: process.platform,
       mode: GATEWAY_CLIENT_MODES.UI,

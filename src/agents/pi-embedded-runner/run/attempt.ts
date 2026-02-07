@@ -336,7 +336,9 @@ export async function runEmbeddedAttempt(
       },
     });
     const isDefaultAgent = sessionAgentId === defaultAgentId;
-    const promptMode = isSubagentSessionKey(params.sessionKey) ? "minimal" : "full";
+    const isLocalGateway = params.config?.gateway?.mode === "local";
+    const promptMode =
+      isSubagentSessionKey(params.sessionKey) || isLocalGateway ? "minimal" : "full";
     const docsPath = await resolveOpenClawDocsPath({
       workspaceDir: effectiveWorkspace,
       argv1: process.argv[1],
