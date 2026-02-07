@@ -1,4 +1,3 @@
-import type { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_AGENT_WORKSPACE_DIR } from "../agents/workspace.js";
@@ -8,25 +7,11 @@ import {
   promptDefaultModel,
 } from "../commands/model-picker.js";
 import { ensureWorkspaceAndSessions } from "../commands/onboard-helpers.js";
-import {
-  createConfigIO,
-  readConfigFileSnapshot,
-  writeConfigFile,
-  type OpenClawConfig,
-} from "../config/config.js";
+import { writeConfigFile, type OpenClawConfig } from "../config/config.js";
 import { logConfigUpdated } from "../config/logging.js";
-import { DEFAULT_GATEWAY_PORT, resolveStateDir } from "../config/paths.js";
+import { DEFAULT_GATEWAY_PORT } from "../config/paths.js";
 import { defaultRuntime } from "../runtime.js";
-import { runTui } from "../tui/tui.js";
 import { createClackPrompter } from "../wizard/clack-prompter.js";
-import { runCommandWithRuntime } from "./cli-utils.js";
-
-async function loadMainConfigSnapshot(params: { sharedStateDir: string }) {
-  const env = { ...process.env };
-  delete env.OPENCLAW_CONFIG_PATH;
-  env.OPENCLAW_STATE_DIR = params.sharedStateDir;
-  return await createConfigIO({ env }).readConfigFileSnapshot();
-}
 
 function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
   const defaults = cfg.agents?.defaults ?? {};
@@ -59,20 +44,15 @@ function applyLocalDefaults(cfg: OpenClawConfig): OpenClawConfig {
   };
 }
 
-async function ensureLocalConfigExists(params: {
-  configPath: string;
-}): Promise<{ created: boolean; config: OpenClawConfig }> {
-  const snapshot = await readConfigFileSnapshot();
-  if (snapshot.exists) {
-    return { created: false, config: snapshot.config ?? {} };
-  }
-
+/**
+ * Run the local-model onboarding flow when the localclaw config file
+ * does not yet exist. Called from the config-guard on first run.
+ */
+export async function runLocalOnboarding(params: { configPath: string }): Promise<void> {
   const prompter = createClackPrompter();
-  await prompter.intro("OpenClaw local");
+  await prompter.intro("LocalClaw — first-run setup");
 
-  const sharedStateDir = resolveStateDir();
-  const mainSnapshot = await loadMainConfigSnapshot({ sharedStateDir });
-  const base = applyLocalDefaults(mainSnapshot.config ?? {});
+  const base = applyLocalDefaults({});
 
   const selection = await promptDefaultModel({
     config: base,
@@ -102,26 +82,5 @@ async function ensureLocalConfigExists(params: {
     skipBootstrap: Boolean(next.agents?.defaults?.skipBootstrap),
   });
 
-  await prompter.outro("Local config ready.");
-
-  return { created: true, config: next };
-}
-
-export function registerLocalCli(program: Command) {
-  program
-    .command("local")
-    .description("Launch the terminal UI with a local-first configuration")
-    .action(async () => {
-      await runCommandWithRuntime(defaultRuntime, async () => {
-        const sharedStateDir = resolveStateDir();
-        process.env.OPENCLAW_PROFILE = "local";
-        process.env.OPENCLAW_STATE_DIR = sharedStateDir;
-        const configPath = path.join(sharedStateDir, "openclaw.local.json");
-        process.env.OPENCLAW_CONFIG_PATH = configPath;
-
-        await ensureLocalConfigExists({ configPath });
-
-        await runTui({});
-      });
-    });
+  await prompter.outro("Local config ready. Run any localclaw command to get started.");
 }

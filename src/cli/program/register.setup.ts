@@ -10,7 +10,7 @@ import { hasExplicitOptions } from "../command-options.js";
 export function registerSetupCommand(program: Command) {
   program
     .command("setup")
-    .description("Initialize ~/.openclaw/openclaw.json and the agent workspace")
+    .description("Initialize ~/.openclaw/openclaw.local.json and the agent workspace")
     .addHelpText(
       "after",
       () =>

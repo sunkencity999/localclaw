@@ -1,12 +1,12 @@
 {
-  "name": "openclaw",
+  "name": "localclaw",
   "version": "2026.2.1",
-  "description": "WhatsApp gateway CLI (Baileys web) with Pi RPC agent",
+  "description": "Local-first AI assistant CLI powered by OpenClaw",
   "keywords": [],
   "license": "MIT",
   "author": "",
   "bin": {
-    "openclaw": "openclaw.mjs"
+    "localclaw": "openclaw.mjs"
   },
   "files": [
     "CHANGELOG.md",

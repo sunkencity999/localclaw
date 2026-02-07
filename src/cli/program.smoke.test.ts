@@ -11,7 +11,6 @@ const callGateway = vi.fn();
 const runChannelLogin = vi.fn();
 const runChannelLogout = vi.fn();
 const runTui = vi.fn();
-const localAction = vi.fn();
 
 const runtime = {
   log: vi.fn(),
@@ -42,11 +41,6 @@ vi.mock("../commands/onboard.js", () => ({ onboardCommand }));
 vi.mock("../runtime.js", () => ({ defaultRuntime: runtime }));
 vi.mock("./channel-auth.js", () => ({ runChannelLogin, runChannelLogout }));
 vi.mock("../tui/tui.js", () => ({ runTui }));
-vi.mock("./local-cli.js", () => ({
-  registerLocalCli: (program: Command) => {
-    program.command("local").action(localAction);
-  },
-}));
 vi.mock("../gateway/call.js", () => ({
   callGateway,
   randomIdempotencyKey: () => "idem-test",
@@ -120,12 +114,6 @@ describe("cli program (smoke)", () => {
       from: "user",
     });
     expect(runTui).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 45000 }));
-  });
-
-  it("runs local command", async () => {
-    const program = buildProgram();
-    await program.parseAsync(["local"], { from: "user" });
-    expect(localAction).toHaveBeenCalledTimes(1);
   });
 
   it("warns and ignores invalid tui timeout override", async () => {

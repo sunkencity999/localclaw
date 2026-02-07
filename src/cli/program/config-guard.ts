@@ -5,7 +5,7 @@ import { colorize, isRich, theme } from "../../terminal/theme.js";
 import { shortenHomePath } from "../../utils.js";
 import { formatCliCommand } from "../command-format.js";
 
-const ALLOWED_INVALID_COMMANDS = new Set(["doctor", "logs", "health", "help", "status", "local"]);
+const ALLOWED_INVALID_COMMANDS = new Set(["doctor", "logs", "health", "help", "status"]);
 const ALLOWED_INVALID_GATEWAY_SUBCOMMANDS = new Set([
   "status",
   "probe",
@@ -37,6 +37,14 @@ export async function ensureConfigReady(params: {
   }
 
   const snapshot = await readConfigFileSnapshot();
+
+  // First-run: if the config file doesn't exist yet, run local onboarding.
+  if (!snapshot.exists) {
+    const { runLocalOnboarding } = await import("../local-cli.js");
+    await runLocalOnboarding({ configPath: snapshot.path });
+    return;
+  }
+
   const commandName = params.commandPath?.[0];
   const subcommandName = params.commandPath?.[1];
   const allowInvalid = commandName
@@ -74,7 +82,7 @@ export async function ensureConfigReady(params: {
   }
   params.runtime.error("");
   params.runtime.error(
-    `${muted("Run:")} ${commandText(formatCliCommand("openclaw doctor --fix"))}`,
+    `${muted("Run:")} ${commandText(formatCliCommand("localclaw doctor --fix"))}`,
   );
   if (!allowInvalid) {
     params.runtime.exit(1);
