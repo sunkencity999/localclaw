@@ -107,15 +107,6 @@ You can also point LocalClaw at any OpenAI-compatible API endpoint via the confi
 Runtime: **Node 22+**.
 
 ```bash
-npm install -g localclaw@latest
-# or: pnpm add -g localclaw@latest
-```
-
-On first run, LocalClaw will detect available local model servers and guide you through setup.
-
-### From source
-
-```bash
 git clone https://github.com/sunkencity999/localclaw.git
 cd localclaw
 
@@ -124,6 +115,15 @@ pnpm build
 
 # Run directly from source
 pnpm localclaw
+```
+
+On first run, LocalClaw will detect available local model servers and guide you through setup.
+
+To install globally from the cloned repo:
+
+```bash
+npm install -g .
+# now available as: localclaw
 ```
 
 ## Quick start
