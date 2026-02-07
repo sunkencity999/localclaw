@@ -224,10 +224,11 @@ async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
       data.models.map(async (model) => {
         const modelId = model.name;
         const modelInfo = await fetchOllamaModelInfo(modelId);
+        // Don't flag Ollama thinking models as reasoning — Ollama's OpenAI-compatible
+        // endpoint rejects non-boolean `think` values (e.g. "low") that the agent
+        // pipeline sends for reasoning models.  The model will still think internally.
         const isReasoning =
-          modelInfo.thinking ||
-          modelId.toLowerCase().includes("r1") ||
-          modelId.toLowerCase().includes("reasoning");
+          modelId.toLowerCase().includes("r1") || modelId.toLowerCase().includes("reasoning");
         const contextWindow = modelInfo.contextWindow ?? OLLAMA_DEFAULT_CONTEXT_WINDOW;
         return {
           id: modelId,
