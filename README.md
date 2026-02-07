@@ -95,60 +95,92 @@ The defaults work well out of the box, but you can override any setting in `~/.l
 ## Supported local model providers
 
 | Provider | Default endpoint |
-|----------|-----------------|
+|----------|------------------|
 | **Ollama** | `http://127.0.0.1:11434/v1` |
 | **LM Studio** | `http://127.0.0.1:1234/v1` |
 | **vLLM** | `http://127.0.0.1:8000/v1` |
 
 You can also point LocalClaw at any OpenAI-compatible API endpoint via the config or onboarding wizard.
 
-## Install
+## Prerequisites
 
-Runtime: **Node 22+**.
+1. **Node 22+** — check with `node -v`
+2. **pnpm** — install with `npm install -g pnpm` if you don't have it
+3. **A local model server** — [Ollama](https://ollama.com) is the easiest to get started with:
+
+```bash
+# Install Ollama (macOS)
+brew install ollama
+
+# Start the Ollama server
+ollama serve
+
+# Pull a model (in a separate terminal)
+ollama pull qwen3:8b
+```
+
+> Any model works. Good starting points: `qwen3:8b`, `llama3.1`, `gemma3:12b`, `glm-4.7-flash`. Larger models give better results but need more RAM.
+
+## Install
 
 ```bash
 git clone https://github.com/sunkencity999/localclaw.git
 cd localclaw
-
 pnpm install
 pnpm build
-
-# Run directly from source
-pnpm localclaw
 ```
 
-On first run, LocalClaw will detect available local model servers and guide you through setup.
-
-To install globally from the cloned repo:
+Optionally install globally so `localclaw` is available everywhere:
 
 ```bash
 npm install -g .
-# now available as: localclaw
 ```
 
 ## Quick start
 
+Follow these steps **in order**. If you installed globally, replace `pnpm localclaw` with `localclaw`.
+
+### Step 1 — First-run setup
+
 ```bash
-# First run — walks you through local model selection
-localclaw
+pnpm localclaw
+```
 
-# Start the gateway
-localclaw gateway --verbose
+On first run, LocalClaw detects your running model server, lists available models, and walks you through picking a default. This creates your config at `~/.localclaw/openclaw.local.json`.
 
-# Talk to the agent
-localclaw agent --message "Summarize this project" --thinking high
+> **Important:** Make sure your model server (e.g. Ollama) is running *before* this step so LocalClaw can discover your models automatically.
 
-# Send a message
-localclaw message send --to +1234567890 --message "Hello from LocalClaw"
+### Step 2 — Start the gateway
 
-# Check status
-localclaw status
+The gateway is the background service that manages agent sessions, tools, and events:
 
-# Open the TUI
-localclaw tui
+```bash
+pnpm localclaw gateway
+```
+
+Leave this running in its own terminal (or add `--verbose` to see detailed logs).
+
+### Step 3 — Chat
+
+Open a new terminal and launch the TUI:
+
+```bash
+pnpm localclaw tui
+```
+
+Type a message and hit Enter. You're talking to a local AI agent with full tool access.
+
+### Other useful commands
+
+```bash
+# One-shot agent query (no TUI)
+pnpm localclaw agent --message "Summarize this project"
+
+# Check gateway and model status
+pnpm localclaw status
 
 # Diagnose issues
-localclaw doctor
+pnpm localclaw doctor
 ```
 
 ## Configuration
