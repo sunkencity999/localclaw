@@ -24,6 +24,74 @@
 - **Full OpenClaw feature set** — gateway, TUI, agent, browser control, skills, sessions, tools — all via `localclaw <command>`.
 - **Separate gateway port** — defaults to port `18790` so it doesn't conflict with an OpenClaw gateway on `18789`.
 
+## Smart Context Management for Small Models
+
+Local models typically have much smaller context windows (8K-32K tokens) compared to cloud models (128K-200K+). LocalClaw includes a multi-layered context management system designed to deliver a great agentic experience even within these constraints. **All of this is automatic** — no configuration needed.
+
+### What LocalClaw does differently
+
+**1. Aggressive context pruning (always-on)**
+
+Unlike cloud-optimized setups that only prune when cache TTL expires, LocalClaw prunes _every turn_:
+- Tool results are soft-trimmed at just 20% context usage (keeping only head/tail summaries)
+- Full tool results are cleared at 40% usage with a placeholder
+- Each tool result is capped at 2K characters (vs 8K for cloud models)
+
+**2. Proactive memory persistence**
+
+The agent is instructed to write progress, decisions, and state to `memory/` files in your workspace after every meaningful step — not just before compaction. This means context that would be lost during summarization is safely on disk.
+
+- `memory/state.md` — current task state, modified files, decisions
+- `memory/progress.md` — completed steps and findings
+- `memory/plan.md` — task decomposition for multi-step work
+- `memory/notes.md` — learned preferences and project conventions
+
+**3. Tighter compaction with early memory flush**
+
+When the context window fills up, LocalClaw summarizes old history more aggressively:
+- History is capped at 30% of the context window (vs 50% for cloud)
+- Memory flush triggers every compaction cycle (not just near the threshold)
+- Reserve tokens floor is set to 2K (vs 20K), appropriate for small windows
+
+**4. Compact system prompts**
+
+Bootstrap files (AGENTS.md, SOUL.md, etc.) are capped at 8K characters total, leaving more room for actual conversation and tool results.
+
+**5. Task decomposition**
+
+The agent automatically breaks complex tasks into discrete steps, persisting plans and intermediate results to disk so it can recover from context compaction without losing track of multi-step work.
+
+### Tuning (optional)
+
+The defaults work well out of the box, but you can override any setting in `~/.openclaw/openclaw.local.json`:
+
+```json5
+{
+  agents: {
+    defaults: {
+      // Context pruning
+      contextPruning: {
+        mode: "always",       // "always" | "cache-ttl" | "off"
+        softTrimRatio: 0.2,   // Start trimming at 20% of context
+        hardClearRatio: 0.4,  // Clear old results at 40%
+        softTrim: { maxChars: 2000 },
+      },
+      // Compaction
+      compaction: {
+        maxHistoryShare: 0.3,       // Cap history at 30% of window
+        reserveTokensFloor: 2000,
+        memoryFlush: {
+          compactionInterval: 1,    // Flush memories every compaction
+          softThresholdTokens: 2000,
+        },
+      },
+      // System prompt budget
+      bootstrapMaxChars: 8000,
+    },
+  },
+}
+```
+
 ## Supported local model providers
 
 | Provider | Default endpoint |
