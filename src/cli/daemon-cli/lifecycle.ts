@@ -1,8 +1,10 @@
+import fs from "node:fs/promises";
 import type { DaemonLifecycleOptions } from "./types.js";
 import { resolveIsNixMode } from "../../config/paths.js";
 import { resolveGatewayService } from "../../daemon/service.js";
 import { renderSystemdUnavailableHints } from "../../daemon/systemd-hints.js";
 import { isSystemdUserServiceAvailable } from "../../daemon/systemd.js";
+import { readLockPayload, resolveGatewayLockPath } from "../../infra/gateway-lock.js";
 import { isWSL } from "../../infra/wsl.js";
 import { defaultRuntime } from "../../runtime.js";
 import { buildDaemonServiceSnapshot, createNullWriter, emitDaemonActionJson } from "./response.js";
@@ -162,6 +164,56 @@ export async function runDaemonStart(opts: DaemonLifecycleOptions = {}) {
   });
 }
 
+async function tryStopViaLockFile(params: {
+  json: boolean;
+  stdout: NodeJS.WritableStream;
+}): Promise<boolean> {
+  try {
+    const { lockPath } = resolveGatewayLockPath(process.env);
+    const payload = await readLockPayload(lockPath);
+    if (!payload?.pid) {
+      return false;
+    }
+    // Check if process is alive
+    try {
+      process.kill(payload.pid, 0);
+    } catch {
+      // Process already dead — clean up stale lock
+      await fs.rm(lockPath, { force: true });
+      return false;
+    }
+    // Kill the process
+    process.kill(payload.pid, "SIGTERM");
+    // Wait briefly for it to exit
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      try {
+        process.kill(payload.pid, 0);
+      } catch {
+        // Process exited
+        await fs.rm(lockPath, { force: true });
+        if (!params.json) {
+          defaultRuntime.log(`Stopped gateway process (pid ${payload.pid}).`);
+        }
+        return true;
+      }
+    }
+    // Force kill if still alive after 5s
+    try {
+      process.kill(payload.pid, "SIGKILL");
+    } catch {
+      // already dead
+    }
+    await fs.rm(lockPath, { force: true });
+    if (!params.json) {
+      defaultRuntime.log(`Force-stopped gateway process (pid ${payload.pid}).`);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function runDaemonStop(opts: DaemonLifecycleOptions = {}) {
   const json = Boolean(opts.json);
   const stdout = json ? createNullWriter() : process.stdout;
@@ -200,6 +252,12 @@ export async function runDaemonStop(opts: DaemonLifecycleOptions = {}) {
     return;
   }
   if (!loaded) {
+    // No service loaded — try PID-based fallback via lock file
+    const stopped = await tryStopViaLockFile({ json, stdout });
+    if (stopped) {
+      emit({ ok: true, result: "stopped", service: buildDaemonServiceSnapshot(service, false) });
+      return;
+    }
     emit({
       ok: true,
       result: "not-loaded",

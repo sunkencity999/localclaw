@@ -83,7 +83,12 @@ function isGatewayArgv(args: string[]): boolean {
   }
 
   const exe = normalized[0] ?? "";
-  return exe.endsWith("/openclaw") || exe === "openclaw";
+  return (
+    exe.endsWith("/openclaw") ||
+    exe === "openclaw" ||
+    exe.endsWith("/localclaw") ||
+    exe === "localclaw"
+  );
 }
 
 function readLinuxCmdline(pid: number): string[] | null {
@@ -139,7 +144,7 @@ function resolveGatewayOwnerStatus(
   return isGatewayArgv(args) ? "alive" : "dead";
 }
 
-async function readLockPayload(lockPath: string): Promise<LockPayload | null> {
+export async function readLockPayload(lockPath: string): Promise<LockPayload | null> {
   try {
     const raw = await fs.readFile(lockPath, "utf8");
     const parsed = JSON.parse(raw) as Partial<LockPayload>;
@@ -164,7 +169,7 @@ async function readLockPayload(lockPath: string): Promise<LockPayload | null> {
   }
 }
 
-function resolveGatewayLockPath(env: NodeJS.ProcessEnv) {
+export function resolveGatewayLockPath(env: NodeJS.ProcessEnv) {
   const stateDir = resolveStateDir(env);
   const configPath = resolveConfigPath(env, stateDir);
   const hash = createHash("sha1").update(configPath).digest("hex").slice(0, 8);
