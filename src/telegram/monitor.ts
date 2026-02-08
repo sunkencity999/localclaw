@@ -87,6 +87,19 @@ const isGrammyHttpError = (err: unknown): boolean => {
   return (err as { name?: string }).name === "HttpError";
 };
 
+/** Check if error is a raw TypeError from Node's undici fetch (not wrapped in Grammy HttpError) */
+const isRawFetchTypeError = (err: unknown): boolean => {
+  if (!err || typeof err !== "object") {
+    return false;
+  }
+  const typed = err as { name?: string; message?: string };
+  return (
+    typed.name === "TypeError" &&
+    typeof typed.message === "string" &&
+    typed.message.includes("fetch failed")
+  );
+};
+
 export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
   const log = opts.runtime?.error ?? console.error;
 
@@ -98,6 +111,15 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
     if (isGrammyHttpError(err) && isRecoverableTelegramNetworkError(err, { context: "polling" })) {
       log(`[telegram] Suppressed network error: ${formatErrorMessage(err)}`);
       return true; // handled - don't crash
+    }
+    // Raw TypeError from Node's undici fetch (not wrapped in Grammy HttpError)
+    // occurs when the network is completely unreachable during bot setup calls.
+    if (
+      isRawFetchTypeError(err) &&
+      isRecoverableTelegramNetworkError(err, { context: "polling" })
+    ) {
+      log(`[telegram] Suppressed fetch error: ${formatErrorMessage(err)}`);
+      return true;
     }
     return false;
   });
