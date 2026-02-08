@@ -32,6 +32,8 @@ import { ensureControlUiAssetsBuilt } from "../infra/control-ui-assets.js";
 import { runTui } from "../tui/tui.js";
 import { resolveUserPath } from "../utils.js";
 
+const productName = process.env.OPENCLAW_PROFILE === "local" ? "LocalClaw" : "OpenClaw";
+
 type FinalizeOnboardingOptions = {
   flow: WizardFlow;
   opts: OnboardOptions;
@@ -362,8 +364,8 @@ export async function finalizeOnboardingWizard(options: FinalizeOnboardingOption
         [
           `Dashboard link (with token): ${authedUrl}`,
           controlUiOpened
-            ? "Opened in your browser. Keep that tab to control OpenClaw."
-            : "Copy/paste this URL in a browser on this machine to control OpenClaw.",
+            ? `Opened in your browser. Keep that tab to control ${productName}.`
+            : `Copy/paste this URL in a browser on this machine to control ${productName}.`,
           controlUiOpenHint,
         ]
           .filter(Boolean)
@@ -421,8 +423,8 @@ export async function finalizeOnboardingWizard(options: FinalizeOnboardingOption
       [
         `Dashboard link (with token): ${authedUrl}`,
         controlUiOpened
-          ? "Opened in your browser. Keep that tab to control OpenClaw."
-          : "Copy/paste this URL in a browser on this machine to control OpenClaw.",
+          ? `Opened in your browser. Keep that tab to control ${productName}.`
+          : `Copy/paste this URL in a browser on this machine to control ${productName}.`,
         controlUiOpenHint,
       ]
         .filter(Boolean)
@@ -466,9 +468,9 @@ export async function finalizeOnboardingWizard(options: FinalizeOnboardingOption
 
   await prompter.outro(
     controlUiOpened
-      ? "Onboarding complete. Dashboard opened with your token; keep that tab to control OpenClaw."
+      ? `Onboarding complete. Dashboard opened with your token; keep that tab to control ${productName}.`
       : seededInBackground
         ? "Onboarding complete. Web UI seeded in the background; open it anytime with the tokenized link above."
-        : "Onboarding complete. Use the tokenized dashboard link above to control OpenClaw.",
+        : `Onboarding complete. Use the tokenized dashboard link above to control ${productName}.`,
   );
 }

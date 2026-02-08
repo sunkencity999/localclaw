@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { EventLogEntry } from "../app-events";
+import { resolveCliName } from "../assistant-identity";
 import { formatEventPayload } from "../presenter";
 
 export type DebugProps = {
@@ -51,7 +52,7 @@ export function renderDebug(props: DebugProps) {
               securitySummary
                 ? html`<div class="callout ${securityTone}" style="margin-top: 8px;">
                   Security audit: ${securityLabel}${info > 0 ? ` · ${info} info` : ""}. Run
-                  <span class="mono">openclaw security audit --deep</span> for details.
+                  <span class="mono">${resolveCliName()} security audit --deep</span> for details.
                 </div>`
                 : nothing
             }

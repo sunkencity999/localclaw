@@ -2,6 +2,8 @@ import type { OpenClawApp } from "./app";
 import type { EventLogEntry } from "./app-events";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { GatewayEventFrame, GatewayHelloOk } from "./gateway";
+import { resolveProductName } from "./assistant-identity";
+import { GATEWAY_CLIENT_NAMES } from "../../../src/gateway/protocol/client-info.js";
 import type { Tab } from "./navigation";
 import type { UiSettings } from "./storage";
 import type { AgentsListResult, PresenceEntry, HealthSnapshot, StatusSummary } from "./types";
@@ -122,7 +124,9 @@ export function connectGateway(host: GatewayHost) {
     url: host.settings.gatewayUrl,
     token: host.settings.token.trim() ? host.settings.token : undefined,
     password: host.password.trim() ? host.password : undefined,
-    clientName: "openclaw-control-ui",
+    clientName: resolveProductName() === "LocalClaw"
+      ? GATEWAY_CLIENT_NAMES.LOCALCLAW_CONTROL_UI
+      : GATEWAY_CLIENT_NAMES.CONTROL_UI,
     mode: "webchat",
     onHello: (hello) => {
       host.connected = true;

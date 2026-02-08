@@ -14,7 +14,23 @@ declare global {
   interface Window {
     __OPENCLAW_ASSISTANT_NAME__?: string;
     __OPENCLAW_ASSISTANT_AVATAR__?: string;
+    __OPENCLAW_PRODUCT_NAME__?: string;
+    __OPENCLAW_CLI_NAME__?: string;
   }
+}
+
+export function resolveProductName(): string {
+  if (typeof window !== "undefined" && window.__OPENCLAW_PRODUCT_NAME__) {
+    return window.__OPENCLAW_PRODUCT_NAME__;
+  }
+  return "OpenClaw";
+}
+
+export function resolveCliName(): string {
+  if (typeof window !== "undefined" && window.__OPENCLAW_CLI_NAME__) {
+    return window.__OPENCLAW_CLI_NAME__;
+  }
+  return "openclaw";
 }
 
 function coerceIdentityValue(value: string | undefined, maxLength: number): string | undefined {

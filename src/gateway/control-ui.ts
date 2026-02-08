@@ -177,6 +177,8 @@ interface ControlUiInjectionOpts {
   basePath: string;
   assistantName?: string;
   assistantAvatar?: string;
+  productName?: string;
+  cliName?: string;
 }
 
 function injectControlUiConfig(html: string, opts: ControlUiInjectionOpts): string {
@@ -190,6 +192,8 @@ function injectControlUiConfig(html: string, opts: ControlUiInjectionOpts): stri
     `window.__OPENCLAW_ASSISTANT_AVATAR__=${JSON.stringify(
       assistantAvatar ?? DEFAULT_ASSISTANT_IDENTITY.avatar,
     )};` +
+    `window.__OPENCLAW_PRODUCT_NAME__=${JSON.stringify(opts.productName ?? "OpenClaw")};` +
+    `window.__OPENCLAW_CLI_NAME__=${JSON.stringify(opts.cliName ?? "openclaw")};` +
     `</script>`;
   // Check if already injected
   if (html.includes("__OPENCLAW_ASSISTANT_NAME__")) {
@@ -226,11 +230,14 @@ function serveIndexHtml(res: ServerResponse, indexPath: string, opts: ServeIndex
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
   const raw = fs.readFileSync(indexPath, "utf8");
+  const isLocal = process.env.OPENCLAW_PROFILE === "local";
   res.end(
     injectControlUiConfig(raw, {
       basePath,
       assistantName: identity.name,
       assistantAvatar: avatarValue,
+      productName: isLocal ? "LocalClaw" : "OpenClaw",
+      cliName: isLocal ? "localclaw" : "openclaw",
     }),
   );
 }

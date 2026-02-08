@@ -57,7 +57,8 @@ export async function dashboardCommand(
   }
 
   if (opened) {
-    runtime.log("Opened in your browser. Keep that tab to control OpenClaw.");
+    const productName = process.env.OPENCLAW_PROFILE === "local" ? "LocalClaw" : "OpenClaw";
+    runtime.log(`Opened in your browser. Keep that tab to control ${productName}.`);
   } else if (hint) {
     runtime.log(hint);
   }
