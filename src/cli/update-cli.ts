@@ -713,7 +713,8 @@ export async function updateCommand(opts: UpdateCommandOptions): Promise<void> {
   const showProgress = !opts.json && process.stdout.isTTY;
 
   if (!opts.json) {
-    defaultRuntime.log(theme.heading("Updating OpenClaw..."));
+    const productName = process.env.OPENCLAW_PROFILE === "local" ? "LocalClaw" : "OpenClaw";
+    defaultRuntime.log(theme.heading(`Updating ${productName}...`));
     defaultRuntime.log("");
   }
 
