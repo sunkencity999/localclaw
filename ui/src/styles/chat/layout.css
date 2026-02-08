@@ -100,6 +100,42 @@
   stroke-linejoin: round;
 }
 
+/* New messages indicator - floating pill above the compose area */
+.chat-new-messages {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full, 999px);
+  background: var(--panel-strong, #1a1a2e);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+  white-space: nowrap;
+}
+
+.chat-new-messages:hover {
+  background: var(--panel-hover, #2a2a3e);
+  border-color: var(--accent, #ff9900);
+}
+
+.chat-new-messages svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2px;
+}
+
 /* Chat compose - sticky at bottom */
 .chat-compose {
   position: sticky;

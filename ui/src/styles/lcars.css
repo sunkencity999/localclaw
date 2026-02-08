@@ -859,6 +859,23 @@ body {
   border-radius: 0;
 }
 
+/* New messages indicator — LCARS pill style */
+.chat-new-messages {
+  background: var(--lcars-black);
+  border-color: var(--lcars-orange);
+  color: var(--lcars-orange);
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: var(--lcars-bar-radius);
+}
+
+.chat-new-messages:hover {
+  background: rgba(255, 153, 0, 0.15);
+  border-color: var(--lcars-peach);
+  color: var(--lcars-peach);
+}
+
 /* ===========================================
    LCARS Account Cards
    =========================================== */
