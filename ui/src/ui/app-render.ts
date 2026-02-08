@@ -128,6 +128,10 @@ export function renderApp(state: AppViewState) {
         </div>
       </header>
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
+        <div class="lcars-brand">
+          <div class="lcars-brand__name">${resolveProductName().toUpperCase()}</div>
+          <div class="lcars-brand__sub">GATEWAY CONTROL</div>
+        </div>
         ${TAB_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
           const hasActiveTab = group.tabs.some((tab) => tab === state.tab);

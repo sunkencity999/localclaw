@@ -1,11 +1,12 @@
 # LocalClaw — Local-First AI Assistant
 
 <p align="center">
-  <img src="assets/localclaw-logo.png" alt="LocalClaw" width="500">
+  <img src="ui/public/favicon.svg" alt="LocalClaw" width="120">
 </p>
 
 <p align="center">
-  <strong>Your AI assistant, running entirely on your machine.</strong>
+  <strong>Your AI assistant, running entirely on your machine.</strong><br>
+  <em>LCARS-inspired interface. Local models. Zero cloud dependency.</em>
 </p>
 
 <p align="center">
@@ -13,6 +14,8 @@
 </p>
 
 **LocalClaw** is a local-first personal AI assistant CLI built on [OpenClaw](https://github.com/openclaw/openclaw). It gives you the full power of the OpenClaw agent runtime — gateway, tools, sessions, skills — but defaults to **local model providers** like Ollama, LM Studio, and vLLM. No cloud keys required to get started.
+
+The gateway dashboard features an **LCARS-inspired interface** (Library Computer Access/Retrieval System) — the iconic Star Trek computer display design — with a matching terminal UI color scheme.
 
 > **Coexistence:** LocalClaw installs as a separate `localclaw` binary with its own state directory (`~/.localclaw/`) and config file (`~/.localclaw/openclaw.local.json`). It runs side-by-side with a standard `openclaw` installation without any interference. Different state directory, different config, different gateway port, same machine.
 

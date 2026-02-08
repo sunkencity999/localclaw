@@ -1,22 +1,26 @@
 <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="lobster-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff4d4d"/>
-      <stop offset="100%" stop-color="#991b1b"/>
-    </linearGradient>
-  </defs>
-  <!-- Body -->
-  <path d="M60 10 C30 10 15 35 15 55 C15 75 30 95 45 100 L45 110 L55 110 L55 100 C55 100 60 102 65 100 L65 110 L75 110 L75 100 C90 95 105 75 105 55 C105 35 90 10 60 10Z" fill="url(#lobster-gradient)"/>
-  <!-- Left Claw -->
-  <path d="M20 45 C5 40 0 50 5 60 C10 70 20 65 25 55 C28 48 25 45 20 45Z" fill="url(#lobster-gradient)"/>
-  <!-- Right Claw -->
-  <path d="M100 45 C115 40 120 50 115 60 C110 70 100 65 95 55 C92 48 95 45 100 45Z" fill="url(#lobster-gradient)"/>
-  <!-- Antenna -->
-  <path d="M45 15 Q35 5 30 8" stroke="#ff4d4d" stroke-width="3" stroke-linecap="round"/>
-  <path d="M75 15 Q85 5 90 8" stroke="#ff4d4d" stroke-width="3" stroke-linecap="round"/>
-  <!-- Eyes -->
-  <circle cx="45" cy="35" r="6" fill="#050810"/>
-  <circle cx="75" cy="35" r="6" fill="#050810"/>
-  <circle cx="46" cy="34" r="2.5" fill="#00e5cc"/>
-  <circle cx="76" cy="34" r="2.5" fill="#00e5cc"/>
+  <!-- LCARS-style geometric logo for LocalClaw -->
+  <!-- Background -->
+  <rect width="120" height="120" rx="8" fill="#000000"/>
+  <!-- Elbow — the signature LCARS curved corner (top-left) -->
+  <path d="M8 8 H42 V32 Q42 52 22 52 H8 Z" fill="#CC99CC"/>
+  <!-- Horizontal header bar -->
+  <rect x="46" y="8" width="66" height="20" rx="10" fill="#FF9900"/>
+  <!-- Vertical sidebar bars -->
+  <rect x="8" y="56" width="34" height="12" rx="6" fill="#FF9966"/>
+  <rect x="8" y="72" width="34" height="12" rx="6" fill="#FFCC99"/>
+  <rect x="8" y="88" width="34" height="12" rx="6" fill="#9999FF"/>
+  <!-- Bottom sidebar end-cap -->
+  <rect x="8" y="104" width="34" height="8" rx="4" fill="#CC99CC"/>
+  <!-- Content area — claw mark accent -->
+  <path d="M62 42 L72 72 L66 72 L56 42 Z" fill="#FF9900" opacity="0.9"/>
+  <path d="M74 42 L84 72 L78 72 L68 42 Z" fill="#FF9966" opacity="0.8"/>
+  <path d="M86 42 L96 72 L90 72 L80 42 Z" fill="#FFCC66" opacity="0.7"/>
+  <!-- Status indicator dot -->
+  <circle cx="80" cy="90" r="6" fill="#99FF66"/>
+  <!-- Scan line accents -->
+  <rect x="54" y="80" width="50" height="1" fill="#9999FF" opacity="0.3"/>
+  <rect x="54" y="86" width="40" height="1" fill="#9999FF" opacity="0.2"/>
+  <rect x="54" y="100" width="55" height="1" fill="#CC99CC" opacity="0.2"/>
+  <rect x="54" y="106" width="35" height="1" fill="#CC99CC" opacity="0.15"/>
 </svg>

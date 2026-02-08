@@ -1,0 +1,1137 @@
+/* ===========================================
+   LCARS Theme — Library Computer Access/Retrieval System
+   Inspired by Star Trek TNG/DS9/VOY interfaces
+   =========================================== */
+
+/* ── LCARS Color Palette ── */
+:root {
+  --lcars-orange: #ff9900;
+  --lcars-peach: #ff9966;
+  --lcars-tan: #ffcc99;
+  --lcars-gold: #ffcc66;
+  --lcars-lavender: #cc99cc;
+  --lcars-lilac: #9977aa;
+  --lcars-periwinkle: #9999ff;
+  --lcars-blue: #99ccff;
+  --lcars-mauve: #cc6699;
+  --lcars-red: #cc0000;
+  --lcars-ice: #aaddff;
+  --lcars-white: #ffffff;
+  --lcars-black: #000000;
+  --lcars-sidebar-width: 180px;
+  --lcars-bar-gap: 4px;
+  --lcars-elbow-height: 100px;
+  --lcars-elbow-radius: 48px;
+  --lcars-header-height: 40px;
+  --lcars-bar-radius: 20px;
+
+  /* Override base theme variables */
+  --bg: #000000;
+  --bg-accent: #0a0a0a;
+  --bg-elevated: #111111;
+  --bg-hover: #1a1a1a;
+  --bg-muted: #1a1a1a;
+
+  --card: #0a0a0a;
+  --card-foreground: #cc99cc;
+  --card-highlight: rgba(153, 153, 255, 0.05);
+  --popover: #0a0a0a;
+  --popover-foreground: #cc99cc;
+
+  --panel: #000000;
+  --panel-strong: #0a0a0a;
+  --panel-hover: #1a1a1a;
+  --chrome: rgba(0, 0, 0, 0.95);
+  --chrome-strong: rgba(0, 0, 0, 0.98);
+
+  --text: #cc99cc;
+  --text-strong: #ffcc99;
+  --chat-text: #cc99cc;
+  --muted: #997799;
+  --muted-strong: #776677;
+  --muted-foreground: #997799;
+
+  --border: #332233;
+  --border-strong: #553355;
+  --border-hover: #774477;
+  --input: #221122;
+  --ring: #ff9900;
+
+  --accent: #ff9900;
+  --accent-hover: #ffaa22;
+  --accent-muted: #ff9900;
+  --accent-subtle: rgba(255, 153, 0, 0.15);
+  --accent-foreground: #000000;
+  --accent-glow: rgba(255, 153, 0, 0.3);
+  --primary: #ff9900;
+  --primary-foreground: #000000;
+
+  --secondary: #110a11;
+  --secondary-foreground: #cc99cc;
+  --accent-2: #9999ff;
+  --accent-2-muted: rgba(153, 153, 255, 0.7);
+  --accent-2-subtle: rgba(153, 153, 255, 0.15);
+
+  --ok: #99ff66;
+  --ok-muted: rgba(153, 255, 102, 0.7);
+  --ok-subtle: rgba(153, 255, 102, 0.12);
+  --destructive: #cc0000;
+  --destructive-foreground: #ffffff;
+  --warn: #ffcc66;
+  --warn-muted: rgba(255, 204, 102, 0.75);
+  --warn-subtle: rgba(255, 204, 102, 0.12);
+  --danger: #cc0000;
+  --danger-muted: rgba(204, 0, 0, 0.75);
+  --danger-subtle: rgba(204, 0, 0, 0.12);
+  --info: #99ccff;
+
+  --focus: rgba(255, 153, 0, 0.3);
+  --focus-ring: 0 0 0 2px #000, 0 0 0 4px var(--lcars-orange);
+  --focus-glow: 0 0 0 2px #000, 0 0 0 4px var(--lcars-orange), 0 0 20px var(--accent-glow);
+
+  --grid-line: rgba(153, 153, 255, 0.06);
+
+  /* LCARS Typography */
+  --font-body: "Antonio", "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Antonio", "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius: 0;
+
+  color-scheme: dark;
+}
+
+/* Disable light theme — LCARS is always dark */
+:root[data-theme="light"] {
+  --bg: #000000;
+  --bg-accent: #0a0a0a;
+  --bg-elevated: #111111;
+  --bg-hover: #1a1a1a;
+  --bg-muted: #1a1a1a;
+  --bg-content: #000000;
+
+  --card: #0a0a0a;
+  --card-foreground: #cc99cc;
+  --card-highlight: rgba(153, 153, 255, 0.05);
+
+  --panel: #000000;
+  --panel-strong: #0a0a0a;
+  --panel-hover: #1a1a1a;
+  --chrome: rgba(0, 0, 0, 0.95);
+  --chrome-strong: rgba(0, 0, 0, 0.98);
+
+  --text: #cc99cc;
+  --text-strong: #ffcc99;
+  --chat-text: #cc99cc;
+  --muted: #997799;
+  --muted-foreground: #997799;
+
+  --border: #332233;
+  --border-strong: #553355;
+  --input: #221122;
+
+  --accent: #ff9900;
+  --accent-hover: #ffaa22;
+  --accent-subtle: rgba(255, 153, 0, 0.15);
+  --accent-foreground: #000000;
+  --primary: #ff9900;
+  --primary-foreground: #000000;
+
+  --secondary: #110a11;
+  --secondary-foreground: #cc99cc;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+
+  color-scheme: dark;
+}
+
+/* ── Body ── */
+body {
+  background: var(--lcars-black);
+  letter-spacing: 0.04em;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(255, 153, 0, 0.35);
+  color: #fff;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar-thumb {
+  background: var(--lcars-lilac);
+  border-radius: var(--lcars-bar-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lcars-lavender);
+}
+
+/* ===========================================
+   LCARS Shell Frame
+   =========================================== */
+
+.shell {
+  --shell-nav-width: var(--lcars-sidebar-width);
+  --shell-topbar-height: auto;
+  grid-template-columns: var(--lcars-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar content";
+  gap: 0;
+  background: var(--lcars-black);
+}
+
+/* ===========================================
+   LCARS Topbar → Header Bar
+   =========================================== */
+
+.topbar {
+  grid-area: topbar;
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px 0 0;
+  height: var(--lcars-elbow-height);
+  border-bottom: none;
+  background: transparent;
+}
+
+/* Hide the brand in the topbar — it moves to the elbow */
+.topbar .brand {
+  display: none;
+}
+
+/* LCARS header decorative bar — connects to the elbow */
+.topbar::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 16px;
+  height: var(--lcars-header-height);
+  background: var(--lcars-orange);
+  border-radius: 0 var(--lcars-bar-radius) var(--lcars-bar-radius) 0;
+  z-index: 0;
+}
+
+.topbar-left {
+  position: relative;
+  z-index: 2;
+}
+
+.topbar-left .nav-collapse-toggle {
+  display: none;
+}
+
+.topbar-status {
+  position: relative;
+  z-index: 2;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+/* Status pills in the header — LCARS segments */
+.topbar-status .pill {
+  border: none;
+  border-radius: var(--lcars-bar-radius);
+  background: var(--lcars-periwinkle);
+  color: var(--lcars-black);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 13px;
+}
+
+.topbar-status .pill:hover {
+  background: var(--lcars-blue);
+}
+
+.topbar-status .statusDot {
+  box-shadow: none;
+}
+
+.topbar-status .statusDot.ok {
+  background: var(--lcars-black);
+  box-shadow: none;
+}
+
+/* Theme toggle LCARS styling */
+.topbar-status .theme-toggle {
+  display: none;
+}
+
+/* ===========================================
+   LCARS Navigation Sidebar
+   =========================================== */
+
+.nav {
+  grid-area: sidebar;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* The elbow — the signature LCARS curved corner.
+   The lcars-brand div doubles as the elbow element. */
+.nav::before {
+  display: none;
+}
+
+.lcars-brand {
+  flex-shrink: 0;
+  width: 100%;
+  min-height: var(--lcars-elbow-height);
+  background: var(--lcars-lavender);
+  border-bottom-right-radius: var(--lcars-elbow-radius);
+  padding: 16px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
+.lcars-brand__name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--lcars-black);
+  line-height: 1.1;
+}
+
+.lcars-brand__sub {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  color: var(--lcars-black);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* Cut-out for the elbow curve — creates the inner black curve */
+.nav::after {
+  content: "";
+  display: block;
+  flex-shrink: 0;
+  width: 100%;
+  height: var(--lcars-bar-gap);
+  background: var(--lcars-black);
+}
+
+/* Nav groups */
+.nav-group {
+  margin-bottom: 0;
+  gap: 0;
+}
+
+/* Nav labels — LCARS section dividers */
+.nav-label {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lcars-black);
+  background: var(--lcars-lilac);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 0;
+  margin-bottom: var(--lcars-bar-gap);
+  border-bottom-right-radius: var(--lcars-bar-radius);
+}
+
+.nav-label:hover {
+  background: var(--lcars-lavender);
+  color: var(--lcars-black);
+}
+
+.nav-label__chevron {
+  color: var(--lcars-black);
+}
+
+/* Nav items — LCARS colored bars */
+.nav-item {
+  padding: 8px 14px;
+  border-radius: 0;
+  border: none;
+  background: var(--lcars-peach);
+  color: var(--lcars-black);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 13px;
+  margin-bottom: var(--lcars-bar-gap);
+  border-bottom-right-radius: var(--lcars-bar-radius);
+  transition: background 100ms ease;
+}
+
+/* Alternate bar colors for visual variety */
+.nav-item:nth-child(2n) {
+  background: var(--lcars-tan);
+}
+
+.nav-item:nth-child(3n) {
+  background: var(--lcars-gold);
+}
+
+.nav-item:nth-child(4n) {
+  background: var(--lcars-blue);
+}
+
+.nav-item:hover {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+  text-decoration: none;
+}
+
+.nav-item.active {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+}
+
+.nav-item.active .nav-item__icon {
+  color: var(--lcars-black);
+  opacity: 1;
+}
+
+.nav-item__icon {
+  color: var(--lcars-black);
+  opacity: 0.8;
+}
+
+.nav-item__icon svg {
+  stroke: currentColor;
+}
+
+/* External links group */
+.nav-group--links .nav-label {
+  background: var(--lcars-mauve);
+}
+
+.nav-group--links .nav-item {
+  background: var(--lcars-periwinkle);
+}
+
+.nav-group--links .nav-item:hover {
+  background: var(--lcars-blue);
+}
+
+/* Sidebar bottom end-cap */
+.nav-group:last-child::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 40px;
+  background: var(--lcars-lavender);
+  border-top-right-radius: var(--lcars-bar-radius);
+  margin-top: auto;
+}
+
+/* Collapsed nav */
+.shell--nav-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr);
+}
+
+.shell--chat-focus {
+  grid-template-columns: 0px minmax(0, 1fr);
+}
+
+.shell--chat-focus .nav {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav--collapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===========================================
+   LCARS Content Area
+   =========================================== */
+
+.content {
+  grid-area: content;
+  background: var(--lcars-black);
+  padding: 20px 24px 32px;
+}
+
+:root[data-theme="light"] .content {
+  background: var(--lcars-black);
+}
+
+.content-header {
+  border-bottom: 2px solid var(--lcars-lilac);
+  padding-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lcars-orange);
+}
+
+.page-sub {
+  color: var(--lcars-lavender);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ===========================================
+   LCARS Cards
+   =========================================== */
+
+.card {
+  border: 1px solid var(--lcars-lilac);
+  border-left: 4px solid var(--lcars-periwinkle);
+  background: rgba(10, 10, 20, 0.6);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 20px;
+}
+
+.card:hover {
+  border-color: var(--lcars-lavender);
+  border-left-color: var(--lcars-orange);
+  box-shadow: none;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  color: var(--lcars-tan);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 16px;
+}
+
+.card-sub {
+  color: var(--lcars-lavender);
+}
+
+/* ===========================================
+   LCARS Stats
+   =========================================== */
+
+.stat {
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid var(--lcars-lilac);
+  border-top: 3px solid var(--lcars-peach);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.stat:hover {
+  border-color: var(--lcars-lavender);
+  border-top-color: var(--lcars-orange);
+  box-shadow: none;
+}
+
+.stat-label {
+  color: var(--lcars-lavender);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.stat-value {
+  color: var(--lcars-tan);
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.stat-value.ok {
+  color: var(--ok);
+}
+
+.stat-value.warn {
+  color: var(--lcars-gold);
+}
+
+/* ===========================================
+   LCARS Buttons
+   =========================================== */
+
+.btn {
+  border: none;
+  background: var(--lcars-periwinkle);
+  color: var(--lcars-black);
+  border-radius: var(--lcars-bar-radius);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 13px;
+  box-shadow: none;
+  transition: background 100ms ease;
+}
+
+.btn:hover {
+  background: var(--lcars-blue);
+  color: var(--lcars-black);
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:active {
+  background: var(--lcars-lavender);
+  color: var(--lcars-black);
+  transform: none;
+  box-shadow: none;
+}
+
+.btn.primary {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+  border: none;
+  box-shadow: none;
+}
+
+.btn.primary:hover {
+  background: var(--lcars-gold);
+  border: none;
+  box-shadow: none;
+}
+
+.btn.active {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+  border: none;
+}
+
+.btn.danger {
+  background: var(--lcars-red);
+  color: var(--lcars-white);
+  border: none;
+}
+
+.btn.danger:hover {
+  background: #ee2222;
+  color: var(--lcars-white);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  background: var(--lcars-lilac);
+}
+
+.btn-kbd {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.btn--sm {
+  padding: 5px 12px;
+  font-size: 11px;
+}
+
+/* Icon buttons */
+.btn--icon {
+  background: var(--lcars-periwinkle);
+  border: none;
+  border-radius: var(--lcars-bar-radius);
+  color: var(--lcars-black);
+}
+
+.btn--icon:hover {
+  background: var(--lcars-blue);
+  border: none;
+  color: var(--lcars-black);
+}
+
+:root[data-theme="light"] .btn--icon {
+  background: var(--lcars-periwinkle);
+  border: none;
+  color: var(--lcars-black);
+  box-shadow: none;
+}
+
+:root[data-theme="light"] .btn--icon:hover {
+  background: var(--lcars-blue);
+  border: none;
+  color: var(--lcars-black);
+}
+
+/* ===========================================
+   LCARS Pills
+   =========================================== */
+
+.pill {
+  border: none;
+  border-radius: var(--lcars-bar-radius);
+  background: var(--lcars-lilac);
+  color: var(--lcars-black);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pill:hover {
+  background: var(--lcars-lavender);
+}
+
+.pill.danger {
+  background: var(--lcars-red);
+  color: var(--lcars-white);
+  border: none;
+}
+
+/* ===========================================
+   LCARS Status Dot
+   =========================================== */
+
+.statusDot {
+  background: var(--lcars-red);
+  box-shadow: 0 0 6px rgba(204, 0, 0, 0.6);
+  animation: lcars-pulse 1.5s ease-in-out infinite;
+}
+
+.statusDot.ok {
+  background: var(--ok);
+  box-shadow: 0 0 6px rgba(153, 255, 102, 0.6);
+  animation: none;
+}
+
+@keyframes lcars-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===========================================
+   LCARS Form Fields
+   =========================================== */
+
+.field input,
+.field textarea,
+.field select {
+  border: 1px solid var(--lcars-lilac);
+  background: rgba(10, 10, 20, 0.8);
+  border-radius: 0;
+  color: var(--lcars-lavender);
+  box-shadow: none;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--lcars-orange);
+  box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.2);
+}
+
+.field span {
+  color: var(--lcars-tan);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23cc99cc' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* ===========================================
+   LCARS Status List
+   =========================================== */
+
+.status-list div {
+  border-bottom-color: var(--lcars-lilac);
+}
+
+/* ===========================================
+   LCARS Chat Overrides
+   =========================================== */
+
+.chat-compose {
+  background: linear-gradient(to bottom, transparent, var(--lcars-black) 20%);
+}
+
+:root[data-theme="light"] .chat-compose {
+  background: linear-gradient(to bottom, transparent, var(--lcars-black) 20%);
+}
+
+.chat-compose .chat-compose__field textarea {
+  border: 1px solid var(--lcars-lilac);
+  background: rgba(10, 10, 20, 0.8);
+  border-radius: var(--lcars-bar-radius);
+  color: var(--lcars-lavender);
+  font-family: var(--font-body);
+}
+
+.chat-compose .chat-compose__field textarea:focus {
+  border-color: var(--lcars-orange);
+}
+
+.chat-compose .chat-compose__actions .btn {
+  border-radius: var(--lcars-bar-radius);
+}
+
+/* Chat focus exit button */
+.chat-focus-exit {
+  border: none;
+  background: var(--lcars-mauve);
+  color: var(--lcars-black);
+  border-radius: var(--lcars-bar-radius);
+  box-shadow: none;
+}
+
+.chat-focus-exit:hover {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+  border: none;
+}
+
+/* Chat controls */
+.chat-controls__thinking {
+  background: rgba(153, 153, 255, 0.1);
+  border-color: var(--lcars-lilac);
+  border-radius: var(--lcars-bar-radius);
+}
+
+:root[data-theme="light"] .chat-controls__thinking {
+  background: rgba(153, 153, 255, 0.1);
+  border-color: var(--lcars-lilac);
+}
+
+.chat-controls__separator {
+  color: var(--lcars-lilac);
+}
+
+:root[data-theme="light"] .chat-controls__separator {
+  color: var(--lcars-lilac);
+}
+
+/* Chat attachments */
+.chat-attachments {
+  background: rgba(10, 10, 20, 0.8);
+  border-color: var(--lcars-lilac);
+  border-radius: 0;
+}
+
+:root[data-theme="light"] .chat-attachments {
+  background: rgba(10, 10, 20, 0.8);
+  border-color: var(--lcars-lilac);
+}
+
+.chat-attachment {
+  border-color: var(--lcars-lilac);
+  background: var(--lcars-black);
+  border-radius: 0;
+}
+
+:root[data-theme="light"] .chat-attachment {
+  border-color: var(--lcars-lilac);
+  background: var(--lcars-black);
+}
+
+/* Chat thread */
+.chat-thread {
+  border-radius: 0;
+}
+
+/* ===========================================
+   LCARS Account Cards
+   =========================================== */
+
+.account-card {
+  border: 1px solid var(--lcars-lilac);
+  border-left: 4px solid var(--lcars-peach);
+  border-radius: 0;
+  background: rgba(10, 10, 20, 0.6);
+}
+
+.account-card:hover {
+  border-color: var(--lcars-lavender);
+  border-left-color: var(--lcars-orange);
+}
+
+/* ===========================================
+   LCARS Chat Bubbles & Messages
+   =========================================== */
+
+.chat-bubble {
+  border: 1px solid var(--lcars-lilac);
+  border-left: 3px solid var(--lcars-periwinkle);
+  background: rgba(10, 10, 30, 0.5);
+  border-radius: 0;
+}
+
+.chat-bubble:hover {
+  background: rgba(20, 15, 40, 0.6);
+}
+
+:root[data-theme="light"] .chat-bubble {
+  border-color: var(--lcars-lilac);
+  border-left-color: var(--lcars-periwinkle);
+  background: rgba(10, 10, 30, 0.5);
+  box-shadow: none;
+}
+
+.chat-group.user .chat-bubble {
+  background: rgba(255, 153, 0, 0.1);
+  border-color: var(--lcars-orange);
+  border-left-color: var(--lcars-orange);
+}
+
+:root[data-theme="light"] .chat-group.user .chat-bubble {
+  background: rgba(255, 153, 0, 0.1);
+  border-color: var(--lcars-orange);
+}
+
+.chat-group.user .chat-bubble:hover {
+  background: rgba(255, 153, 0, 0.15);
+}
+
+.chat-bubble.streaming {
+  animation: lcars-stream 1.5s ease-out infinite;
+}
+
+@keyframes lcars-stream {
+  0%, 100% { border-color: var(--lcars-lilac); border-left-color: var(--lcars-periwinkle); }
+  50% { border-color: var(--lcars-orange); border-left-color: var(--lcars-orange); }
+}
+
+/* Chat avatar */
+.chat-avatar {
+  border-radius: 0;
+  background: var(--lcars-lilac);
+  color: var(--lcars-black);
+  font-weight: 700;
+}
+
+.chat-avatar.user {
+  background: var(--lcars-orange);
+  color: var(--lcars-black);
+}
+
+.chat-avatar.assistant {
+  background: var(--lcars-periwinkle);
+  color: var(--lcars-black);
+}
+
+img.chat-avatar {
+  border-radius: 0;
+}
+
+/* Chat thinking */
+.chat-thinking {
+  border: 1px dashed var(--lcars-lilac);
+  background: rgba(153, 153, 255, 0.05);
+  border-radius: 0;
+  color: var(--lcars-lavender);
+}
+
+:root[data-theme="light"] .chat-thinking {
+  border-color: var(--lcars-lilac);
+  background: rgba(153, 153, 255, 0.05);
+}
+
+/* Chat text overrides */
+.chat-text :where(:not(pre) > code) {
+  background: rgba(153, 153, 255, 0.12);
+  border-radius: 0;
+  color: var(--lcars-blue);
+}
+
+.chat-text :where(pre) {
+  background: rgba(0, 0, 20, 0.4);
+  border: 1px solid var(--lcars-lilac);
+  border-radius: 0;
+}
+
+.chat-text :where(blockquote) {
+  border-left-color: var(--lcars-periwinkle);
+  background: rgba(153, 153, 255, 0.04);
+  border-radius: 0;
+}
+
+.chat-text :where(a) {
+  color: var(--lcars-orange);
+}
+
+/* Chat copy button */
+.chat-copy-btn {
+  border: 1px solid var(--lcars-lilac);
+  background: var(--lcars-black);
+  border-radius: 0;
+}
+
+.chat-copy-btn:hover {
+  background: rgba(153, 153, 255, 0.1);
+}
+
+/* Chat sender */
+.chat-sender-name {
+  color: var(--lcars-tan);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.chat-group-timestamp {
+  color: var(--lcars-lilac);
+}
+
+/* ===========================================
+   LCARS Decorative Scan Lines (subtle)
+   =========================================== */
+
+.content::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(153, 153, 255, 0.015) 2px,
+    rgba(153, 153, 255, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ===========================================
+   LCARS Responsive / Tablet
+   =========================================== */
+
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "topbar"
+      "sidebar"
+      "content";
+  }
+
+  .nav::before {
+    display: none;
+  }
+
+  .nav::after {
+    display: none;
+  }
+
+  .nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-bottom: 3px solid var(--lcars-orange);
+    padding: 6px;
+    gap: var(--lcars-bar-gap);
+  }
+
+  .nav-group {
+    display: flex;
+    gap: var(--lcars-bar-gap);
+  }
+
+  .nav-group:last-child::after {
+    display: none;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+    margin-bottom: 0;
+    border-radius: var(--lcars-bar-radius);
+  }
+
+  .topbar {
+    height: auto;
+    padding: 8px 16px;
+  }
+
+  .topbar::after {
+    display: none;
+  }
+
+  .topbar-status .pill {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+}
+
+/* ===========================================
+   LCARS Animations
+   =========================================== */
+
+@keyframes lcars-boot {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  60% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.shell {
+  animation: lcars-boot 0.8s ease-out;
+}
+
+/* Stagger nav items boot animation */
+.nav-item {
+  animation: lcars-bar-slide 0.4s var(--ease-out) backwards;
+}
+
+@keyframes lcars-bar-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nav-item:nth-child(1) { animation-delay: 0.1s; }
+.nav-item:nth-child(2) { animation-delay: 0.15s; }
+.nav-item:nth-child(3) { animation-delay: 0.2s; }
+.nav-item:nth-child(4) { animation-delay: 0.25s; }
+.nav-item:nth-child(5) { animation-delay: 0.3s; }
+.nav-item:nth-child(6) { animation-delay: 0.35s; }
+.nav-item:nth-child(7) { animation-delay: 0.4s; }
+.nav-item:nth-child(8) { animation-delay: 0.45s; }
