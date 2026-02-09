@@ -58,7 +58,7 @@ Browse and search past session transcripts directly in your browser:
 
 ### Proactive Intelligence
 
-On gateway startup, the `proactive-briefing` hook reads your recent session logs (last 24h) and injects a context summary into `HEARTBEAT.md`. The existing heartbeat system then naturally delivers context-aware morning briefings and follow-up reminders based on what you discussed yesterday.
+On gateway startup, the `proactive-briefing` hook reads your recent session logs (last 24h) and writes a context summary to `memory/briefing-context.md`. This gives the agent awareness of recent conversations for context-aware morning briefings and follow-up reminders based on what you discussed yesterday.
 
 ### Workflow Automation Engine
 
