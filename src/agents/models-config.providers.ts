@@ -181,7 +181,9 @@ async function fetchOllamaModelInfo(modelName: string): Promise<OllamaModelInfo>
       body: JSON.stringify({ name: modelName }),
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return fallback;
+    if (!res.ok) {
+      return fallback;
+    }
     const data = (await res.json()) as OllamaShowResponse;
 
     let contextWindow: number | null = null;
