@@ -17,6 +17,7 @@ import {
 import { loadInternalHooks } from "../hooks/loader.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { type PluginServicesHandle, startPluginServices } from "../plugins/services.js";
+import { loadAndRegisterWorkflows } from "../workflows/hook.js";
 import { startBrowserControlServerIfEnabled } from "./server-browser.js";
 import {
   scheduleRestartSentinelWake,
@@ -109,6 +110,18 @@ export async function startGatewaySidecars(params: {
     }
   } catch (err) {
     params.logHooks.error(`failed to load hooks: ${String(err)}`);
+  }
+
+  // Load workspace workflows (event-driven and scheduled).
+  try {
+    const workflowCount = await loadAndRegisterWorkflows(params.cfg);
+    if (workflowCount > 0) {
+      params.logHooks.info(
+        `loaded ${workflowCount} workflow${workflowCount > 1 ? "s" : ""} from workspace`,
+      );
+    }
+  } catch (err) {
+    params.logHooks.error(`failed to load workflows: ${String(err)}`);
   }
 
   // Launch configured channels so gateway replies via the surface the message came from.
