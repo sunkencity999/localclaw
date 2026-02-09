@@ -91,6 +91,15 @@ export type CliBackendConfig = {
   serialize?: boolean;
 };
 
+export type AgentRoutingConfig = {
+  /** Enable smart model routing (default: false). */
+  enabled?: boolean;
+  /** Fast model for simple queries (provider/model string, e.g. "ollama/qwen3:1.7b"). */
+  fastModel?: string;
+  /** Max message length (chars) to consider for fast-model routing (default: 150). */
+  maxSimpleLength?: number;
+};
+
 export type AgentDefaultsConfig = {
   /** Primary model and fallbacks (provider/model). */
   model?: AgentModelListConfig;
@@ -194,6 +203,8 @@ export type AgentDefaultsConfig = {
      */
     includeReasoning?: boolean;
   };
+  /** Smart model routing — route simple queries to a fast model. */
+  routing?: AgentRoutingConfig;
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;
   /** Sub-agent defaults (spawned via sessions_spawn). */

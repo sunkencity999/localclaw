@@ -20,6 +20,7 @@ import { CURRENT_MESSAGE_MARKER, stripMentions, stripStructuralPrefixes } from "
 import { createModelSelectionState, resolveContextTokens } from "./model-selection.js";
 import { formatElevatedUnavailableMessage, resolveElevatedPermissions } from "./reply-elevated.js";
 import { stripInlineStatus } from "./reply-inline.js";
+import { resolveSmartRoute } from "./smart-routing.js";
 
 type AgentDefaults = NonNullable<OpenClawConfig["agents"]>["defaults"];
 type ExecOverrides = Pick<ExecToolDefaults, "host" | "security" | "ask" | "node">;
@@ -394,6 +395,21 @@ export async function resolveReplyDirectives(params: {
   });
   provider = modelState.provider;
   model = modelState.model;
+
+  // Smart routing: route simple queries to a fast model (unless user set /model)
+  if (!directives.hasModelDirective) {
+    const route = resolveSmartRoute({
+      message: cleanedBody,
+      cfg,
+      currentProvider: provider,
+      currentModel: model,
+      defaultProvider,
+    });
+    if (route.routed) {
+      provider = route.provider;
+      model = route.model;
+    }
+  }
 
   let contextTokens = resolveContextTokens({
     agentCfg,
