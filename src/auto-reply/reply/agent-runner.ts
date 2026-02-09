@@ -18,6 +18,7 @@ import {
   updateSessionStore,
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
+import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import { emitDiagnosticEvent, isDiagnosticsEnabled } from "../../infra/diagnostic-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
@@ -394,6 +395,23 @@ export async function runReplyAgent(params: {
       systemPromptReport: runResult.meta.systemPromptReport,
       cliSessionId,
     });
+
+    if (sessionKey) {
+      void triggerInternalHook(
+        createInternalHookEvent("session", "turn-complete", sessionKey, {
+          cfg,
+          sessionFile: followupRun.run.sessionFile,
+          sessionId: followupRun.run.sessionId,
+          modelUsed,
+          providerUsed,
+          inputTokens: usage?.input ?? 0,
+          outputTokens: usage?.output ?? 0,
+          contextTokensUsed,
+          userMessage: commandBody,
+          compacted: runOutcome.autoCompactionCompleted ?? false,
+        }),
+      );
+    }
 
     // Drain any late tool/block deliveries before deciding there's "nothing to send".
     // Otherwise, a late typing trigger (e.g. from a tool callback) can outlive the run and
