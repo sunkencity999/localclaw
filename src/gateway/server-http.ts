@@ -29,6 +29,7 @@ import {
 } from "./hooks.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
+import { handleSessionBrowserRequest } from "./session-browser-api.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
@@ -213,6 +214,7 @@ export function createGatewayHttpServer(opts: {
   handlePluginRequest?: HooksRequestHandler;
   resolvedAuth: import("./auth.js").ResolvedGatewayAuth;
   tlsOptions?: TlsOptions;
+  workspaceDir?: string;
 }): HttpServer {
   const {
     canvasHost,
@@ -285,6 +287,16 @@ export function createGatewayHttpServer(opts: {
           return;
         }
         if (await canvasHost.handleHttpRequest(req, res)) {
+          return;
+        }
+      }
+      if (opts.workspaceDir) {
+        if (
+          handleSessionBrowserRequest(req, res, {
+            workspaceDir: opts.workspaceDir,
+            basePath: controlUiBasePath,
+          })
+        ) {
           return;
         }
       }
