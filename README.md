@@ -27,6 +27,83 @@ The gateway dashboard features an **LCARS-inspired interface** (Library Computer
 - **Full OpenClaw feature set** — gateway, TUI, agent, browser control, skills, sessions, tools — all via `localclaw <command>`.
 - **Separate gateway port** — defaults to port `18790` so it doesn't conflict with an OpenClaw gateway on `18789`.
 
+## What's New
+
+LocalClaw has gained a suite of intelligent features that transform it from a basic local chat interface into a proactive, self-managing AI assistant.
+
+### Startup Health Check
+
+The gateway now validates your entire model stack on every boot:
+
+- Confirms your model server (Ollama, LM Studio, vLLM) is reachable
+- Verifies your configured model is actually available
+- Checks that your model's context window meets minimum requirements
+- Logs clear warnings if anything is misconfigured — no more silent failures
+
+### Smart Model Routing
+
+Simple queries (greetings, yes/no questions, quick lookups) are automatically routed to a faster, smaller model while complex requests (code generation, analysis, multi-step reasoning) go to your primary model. This saves time and compute without sacrificing quality. Configured via `agents.defaults.routing` in your config.
+
+### Session Auto-Save
+
+Every agent turn is automatically logged to `memory/sessions/` as a timestamped markdown file. Session logs include user messages, assistant responses, model info, and token counts. No more lost conversations.
+
+### Dashboard Session Browser
+
+Browse and search past session transcripts directly in your browser:
+
+- **`/sessions`** — full session browser UI with dark LCARS-inspired theme
+- **`/api/sessions`** — REST API for listing, searching, and retrieving session logs
+- Full-text search across all sessions
+
+### Proactive Intelligence
+
+On gateway startup, the `proactive-briefing` hook reads your recent session logs (last 24h) and injects a context summary into `HEARTBEAT.md`. The existing heartbeat system then naturally delivers context-aware morning briefings and follow-up reminders based on what you discussed yesterday.
+
+### Workflow Automation Engine
+
+Define event-driven, multi-step pipelines as simple YAML files in `workspace/workflows/`:
+
+```yaml
+name: startup-log
+trigger:
+  event: gateway:startup
+steps:
+  - action: write-file
+    path: memory/startup-log.md
+    content: "Gateway started"
+    append: true
+  - action: notify
+    message: "System ready"
+```
+
+Supports three step types (`agent-turn`, `notify`, `write-file`) and two trigger modes (`event` for hook-driven, `schedule` for cron-based).
+
+### Deep OS Integration
+
+- **Clipboard** — full read/write clipboard access (`pbpaste`/`pbcopy` on macOS, `xclip`/`wl-paste` on Linux)
+- **Focus Mode** — suppress heartbeat delivery during deep work sessions, with auto-expiry and buffered alerts
+- **Workspace File Watcher** — monitors workspace files for changes and fires `workspace:file-changed` hook events with debouncing
+
+### Learning and Personalization
+
+The `user-learning` hook observes your interactions and builds a preference profile over time:
+
+- **Active hours** — when you typically interact
+- **Message style** — average length, question frequency
+- **Tool preferences** — which tools/actions you request most
+- **Topic frequency** — common themes in your conversations
+
+Stored at `memory/user-preferences.json` and available for other hooks to personalize behavior.
+
+### Enhanced Multimodal Pipeline
+
+- **Document Indexer** — auto-indexes text files from `workspace/documents/` for agent context
+- **Diagram Pipeline** — detects Mermaid code blocks in agent output and renders them to SVG (via `mmdc`) or saves `.mmd` source files
+- **Voice Pipeline** — STT via `whisper-cpp`, TTS via macOS `say`, with automatic capability detection
+
+---
+
 ## Smart Context Management for Small Models
 
 Local models typically have much smaller context windows (8K-32K tokens) compared to cloud models (128K-200K+). LocalClaw includes a multi-layered context management system designed to deliver a great agentic experience even within these constraints. **All of this is automatic** — no configuration needed.
