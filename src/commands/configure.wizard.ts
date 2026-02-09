@@ -5,6 +5,7 @@ import type {
   ConfigureWizardParams,
   WizardSection,
 } from "./configure.shared.js";
+import { loadModelCatalog } from "../agents/model-catalog.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { readConfigFileSnapshot, resolveGatewayPort, writeConfigFile } from "../config/config.js";
 import { logConfigUpdated } from "../config/logging.js";
@@ -28,6 +29,7 @@ import {
 } from "./configure.shared.js";
 import { formatHealthCheckFailure } from "./health-format.js";
 import { healthCommand } from "./health.js";
+import { LOCAL_MODEL_PROVIDERS } from "./model-picker.js";
 import { noteChannelStatus, setupChannels } from "./onboard-channels.js";
 import {
   applyWizardMetadata,
@@ -40,6 +42,7 @@ import {
   summarizeExistingConfig,
   waitForGatewayReachable,
 } from "./onboard-helpers.js";
+import { setupInternalHooks } from "./onboard-hooks.js";
 import { promptRemoteGatewayConfig } from "./onboard-remote.js";
 import { setupSkills } from "./onboard-skills.js";
 
@@ -86,6 +89,130 @@ async function promptChannelMode(runtime: RuntimeEnv): Promise<ChannelsWizardMod
     }),
     runtime,
   ) as ChannelsWizardMode;
+}
+
+async function promptRoutingConfig(
+  nextConfig: OpenClawConfig,
+  runtime: RuntimeEnv,
+  prompter: ReturnType<typeof createClackPrompter>,
+): Promise<OpenClawConfig> {
+  const routing = nextConfig.agents?.defaults?.routing;
+  const isEnabled = routing?.enabled === true;
+  const currentFastModel = routing?.fastModel ?? "";
+  const currentMaxLen = routing?.maxSimpleLength ?? 150;
+
+  note(
+    [
+      "Smart routing classifies incoming messages as simple or complex.",
+      "Simple queries (greetings, short questions) are routed to a fast/small model.",
+      "Complex queries (code tasks, multi-step requests) use your primary model.",
+      "",
+      `Current: ${isEnabled ? `enabled (fast model: ${currentFastModel || "not set"})` : "disabled"}`,
+    ].join("\n"),
+    "Smart routing",
+  );
+
+  const enable = guardCancel(
+    await confirm({
+      message: "Enable smart model routing?",
+      initialValue: isEnabled,
+    }),
+    runtime,
+  );
+
+  if (!enable) {
+    return {
+      ...nextConfig,
+      agents: {
+        ...nextConfig.agents,
+        defaults: {
+          ...nextConfig.agents?.defaults,
+          routing: { enabled: false },
+        },
+      },
+    };
+  }
+
+  // Try to offer local models from the catalog
+  let fastModel = currentFastModel;
+  const catalog = await loadModelCatalog({ config: nextConfig, useCache: false });
+  const localModels = catalog.filter((e) =>
+    LOCAL_MODEL_PROVIDERS.includes(e.provider as (typeof LOCAL_MODEL_PROVIDERS)[number]),
+  );
+
+  if (localModels.length > 0) {
+    const options = [
+      { value: "__manual__", label: "Enter manually" },
+      ...localModels.slice(0, 20).map((m) => ({
+        value: `${m.provider}/${m.name}`,
+        label: `${m.provider}/${m.name}`,
+        hint: m.contextWindow ? `${Math.round(m.contextWindow / 1024)}K ctx` : undefined,
+      })),
+    ];
+    const selected = guardCancel(
+      await prompter.select({
+        message: "Fast model for simple queries",
+        options,
+        initialValue: currentFastModel || options[1]?.value,
+      }),
+      runtime,
+    );
+    if (selected !== "__manual__") {
+      fastModel = selected;
+    }
+  }
+
+  if (!fastModel || fastModel === "__manual__") {
+    const input = guardCancel(
+      await text({
+        message: "Fast model (provider/model, e.g. ollama/qwen3:1.7b)",
+        initialValue: currentFastModel,
+        validate: (v) =>
+          String(v ?? "")
+            .trim()
+            .includes("/")
+            ? undefined
+            : "Use provider/model format",
+      }),
+      runtime,
+    );
+    fastModel = String(input ?? "").trim();
+  }
+
+  const maxLenInput = guardCancel(
+    await text({
+      message: "Max message length (chars) to consider for fast routing",
+      initialValue: String(currentMaxLen),
+      validate: (v) =>
+        Number.isFinite(Number(v)) && Number(v) > 0 ? undefined : "Must be a positive number",
+    }),
+    runtime,
+  );
+  const maxSimpleLength = Number.parseInt(String(maxLenInput), 10);
+
+  note(
+    [
+      `Smart routing: ${fastModel ? "enabled" : "disabled"}`,
+      `Fast model: ${fastModel}`,
+      `Max simple length: ${maxSimpleLength} chars`,
+    ].join("\n"),
+    "Routing configured",
+  );
+
+  return {
+    ...nextConfig,
+    agents: {
+      ...nextConfig.agents,
+      defaults: {
+        ...nextConfig.agents?.defaults,
+        routing: {
+          enabled: true,
+          fastModel,
+          maxSimpleLength,
+        },
+      },
+    },
+  };
 }
 
 async function promptWebToolsConfig(
@@ -349,6 +476,14 @@ export async function runConfigureWizard(
         nextConfig = await setupSkills(nextConfig, wsDir, runtime, prompter);
       }
 
+      if (selected.includes("hooks")) {
+        nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+      }
+
+      if (selected.includes("routing")) {
+        nextConfig = await promptRoutingConfig(nextConfig, runtime, prompter);
+      }
+
       await persistConfig();
 
       if (selected.includes("daemon")) {
@@ -472,6 +607,16 @@ export async function runConfigureWizard(
         if (choice === "skills") {
           const wsDir = resolveUserPath(workspaceDir);
           nextConfig = await setupSkills(nextConfig, wsDir, runtime, prompter);
+          await persistConfig();
+        }
+
+        if (choice === "hooks") {
+          nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+          await persistConfig();
+        }
+
+        if (choice === "routing") {
+          nextConfig = await promptRoutingConfig(nextConfig, runtime, prompter);
           await persistConfig();
         }
 

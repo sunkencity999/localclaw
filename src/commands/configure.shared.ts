@@ -15,6 +15,8 @@ export const CONFIGURE_WIZARD_SECTIONS = [
   "daemon",
   "channels",
   "skills",
+  "hooks",
+  "routing",
   "health",
 ] as const;
 
@@ -47,6 +49,16 @@ export const CONFIGURE_SECTION_OPTIONS: Array<{
     hint: "Link WhatsApp/Telegram/etc and defaults",
   },
   { value: "skills", label: "Skills", hint: "Install/enable workspace skills" },
+  {
+    value: "hooks",
+    label: "Hooks",
+    hint: "Enable/disable session-autosave, learning, briefing hooks",
+  },
+  {
+    value: "routing",
+    label: "Smart routing",
+    hint: "Route simple queries to a fast/small model",
+  },
   {
     value: "health",
     label: "Health check",
