@@ -83,8 +83,18 @@ const OLLAMA_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
-const LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1";
-const VLLM_BASE_URL = "http://127.0.0.1:8000/v1";
+const LMSTUDIO_DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1";
+const VLLM_DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1";
+
+function resolveLmStudioBaseUrl(): string {
+  const env = getEnv();
+  return env.LMSTUDIO_BASE_URL?.trim() || LMSTUDIO_DEFAULT_BASE_URL;
+}
+
+function resolveVllmBaseUrl(): string {
+  const env = getEnv();
+  return env.VLLM_BASE_URL?.trim() || VLLM_DEFAULT_BASE_URL;
+}
 const LOCAL_OPENAI_DEFAULT_CONTEXT_WINDOW = 8192;
 const LOCAL_OPENAI_DEFAULT_MAX_TOKENS = 2048;
 
@@ -530,18 +540,20 @@ async function buildOllamaProvider(): Promise<ProviderConfig> {
 }
 
 async function buildLmStudioProvider(): Promise<ProviderConfig> {
-  const models = await discoverOpenAiCompatibleModels(LMSTUDIO_BASE_URL);
+  const baseUrl = resolveLmStudioBaseUrl();
+  const models = await discoverOpenAiCompatibleModels(baseUrl);
   return {
-    baseUrl: LMSTUDIO_BASE_URL,
+    baseUrl,
     api: "openai-completions",
     models,
   };
 }
 
 async function buildVllmProvider(): Promise<ProviderConfig> {
-  const models = await discoverOpenAiCompatibleModels(VLLM_BASE_URL);
+  const baseUrl = resolveVllmBaseUrl();
+  const models = await discoverOpenAiCompatibleModels(baseUrl);
   return {
-    baseUrl: VLLM_BASE_URL,
+    baseUrl,
     api: "openai-completions",
     models,
   };
@@ -617,14 +629,14 @@ export async function resolveImplicitProviders(params: {
     }
   }
 
-  if (await isLocalOpenAiCompatibleServerReachable(LMSTUDIO_BASE_URL)) {
+  if (await isLocalOpenAiCompatibleServerReachable(resolveLmStudioBaseUrl())) {
     const provider = await buildLmStudioProvider();
     if (provider.models.length > 0) {
       providers.lmstudio = { ...provider, apiKey: "local" };
     }
   }
 
-  if (await isLocalOpenAiCompatibleServerReachable(VLLM_BASE_URL)) {
+  if (await isLocalOpenAiCompatibleServerReachable(resolveVllmBaseUrl())) {
     const provider = await buildVllmProvider();
     if (provider.models.length > 0) {
       providers.vllm = { ...provider, apiKey: "local" };

@@ -9,11 +9,20 @@ type Log = {
 };
 
 /** Known local provider base URLs (native API, not OpenAI-compat). */
-const LOCAL_PROVIDERS: Record<string, { apiBase: string; displayName: string }> = {
-  ollama: { apiBase: "http://127.0.0.1:11434", displayName: "Ollama" },
-  lmstudio: { apiBase: "http://127.0.0.1:1234", displayName: "LM Studio" },
-  vllm: { apiBase: "http://127.0.0.1:8000", displayName: "vLLM" },
-};
+function resolveLocalProviders(): Record<string, { apiBase: string; displayName: string }> {
+  const lmstudioBase = (
+    process.env.LMSTUDIO_BASE_URL?.trim() || "http://127.0.0.1:1234/v1"
+  ).replace(/\/v1\/?$/, "");
+  const vllmBase = (process.env.VLLM_BASE_URL?.trim() || "http://127.0.0.1:8000/v1").replace(
+    /\/v1\/?$/,
+    "",
+  );
+  return {
+    ollama: { apiBase: "http://127.0.0.1:11434", displayName: "Ollama" },
+    lmstudio: { apiBase: lmstudioBase, displayName: "LM Studio" },
+    vllm: { apiBase: vllmBase, displayName: "vLLM" },
+  };
+}
 
 interface HealthCheckResult {
   provider: string;
@@ -114,7 +123,7 @@ export async function runStartupHealthCheck(params: {
     warnings: [],
   };
 
-  const localProvider = LOCAL_PROVIDERS[provider.toLowerCase()];
+  const localProvider = resolveLocalProviders()[provider.toLowerCase()];
   if (!localProvider) {
     // Cloud provider — skip connectivity checks, just report the model
     params.log.info(`model provider: ${provider} (cloud)`, {
