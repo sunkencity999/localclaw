@@ -180,6 +180,18 @@ The defaults work well out of the box, but you can override any setting in `~/.l
 | **LM Studio** | `http://127.0.0.1:1234/v1` |
 | **vLLM** | `http://127.0.0.1:8000/v1` |
 
+To override the default endpoints, set environment variables before starting the gateway:
+
+```bash
+# Custom LM Studio endpoint (default: http://127.0.0.1:1234/v1)
+export LMSTUDIO_BASE_URL=http://192.168.1.50:1234/v1
+
+# Custom vLLM endpoint (default: http://127.0.0.1:8000/v1)
+export VLLM_BASE_URL=http://192.168.1.50:8000/v1
+```
+
+These are picked up by both the model provider discovery and the gateway health checks.
+
 You can also point LocalClaw at any OpenAI-compatible API endpoint via the config or onboarding wizard.
 
 ## Prerequisites
