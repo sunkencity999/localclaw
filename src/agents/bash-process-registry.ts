@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { appendRunEntry } from "./run-history.js";
 import { createSessionSlug as createSessionSlugId } from "./session-slug.js";
 
 const DEFAULT_JOB_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -157,6 +158,23 @@ export function markBackgrounded(session: ProcessSession) {
 
 function moveToFinished(session: ProcessSession, status: ProcessStatus) {
   runningSessions.delete(session.id);
+  const endedAt = Date.now();
+  // Persist to durable run history (non-blocking, never throws)
+  appendRunEntry({
+    id: session.id,
+    command: session.command,
+    cwd: session.cwd,
+    status: status === "running" ? "completed" : status,
+    exitCode: session.exitCode ?? null,
+    exitSignal: session.exitSignal ?? null,
+    durationMs: endedAt - session.startedAt,
+    outputTail: session.tail || tail(session.aggregated, 2000),
+    truncated: session.truncated,
+    totalOutputChars: session.totalOutputChars,
+    startedAt: session.startedAt,
+    endedAt,
+    scopeKey: session.scopeKey,
+  });
   if (!session.backgrounded) {
     return;
   }
@@ -165,7 +183,7 @@ function moveToFinished(session: ProcessSession, status: ProcessStatus) {
     command: session.command,
     scopeKey: session.scopeKey,
     startedAt: session.startedAt,
-    endedAt: Date.now(),
+    endedAt,
     cwd: session.cwd,
     status,
     exitCode: session.exitCode,

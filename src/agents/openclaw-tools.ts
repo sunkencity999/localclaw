@@ -12,6 +12,7 @@ import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createResourceMonitorTool } from "./tools/resource-monitor-tool.js";
+import { createRunHistoryTool } from "./tools/run-history-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
@@ -140,6 +141,7 @@ export function createOpenClawTools(options?: {
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
     createResourceMonitorTool(),
+    createRunHistoryTool(),
   ];
 
   const pluginTools = resolvePluginTools({
