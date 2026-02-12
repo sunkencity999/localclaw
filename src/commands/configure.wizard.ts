@@ -43,6 +43,7 @@ import {
   waitForGatewayReachable,
 } from "./onboard-helpers.js";
 import { setupInternalHooks } from "./onboard-hooks.js";
+import { setupIntegrations } from "./onboard-integrations.js";
 import { promptRemoteGatewayConfig } from "./onboard-remote.js";
 import { setupSkills } from "./onboard-skills.js";
 
@@ -302,7 +303,7 @@ export async function runConfigureWizard(
 ) {
   try {
     printWizardHeader(runtime);
-    intro(opts.command === "update" ? "OpenClaw update wizard" : "OpenClaw configure");
+    intro(opts.command === "update" ? "LocalClaw update wizard" : "LocalClaw configure");
     const prompter = createClackPrompter();
 
     const snapshot = await readConfigFileSnapshot();
@@ -476,6 +477,10 @@ export async function runConfigureWizard(
         nextConfig = await setupSkills(nextConfig, wsDir, runtime, prompter);
       }
 
+      if (selected.includes("integrations")) {
+        nextConfig = await setupIntegrations(nextConfig, runtime, prompter);
+      }
+
       if (selected.includes("hooks")) {
         nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
       }
@@ -607,6 +612,11 @@ export async function runConfigureWizard(
         if (choice === "skills") {
           const wsDir = resolveUserPath(workspaceDir);
           nextConfig = await setupSkills(nextConfig, wsDir, runtime, prompter);
+          await persistConfig();
+        }
+
+        if (choice === "integrations") {
+          nextConfig = await setupIntegrations(nextConfig, runtime, prompter);
           await persistConfig();
         }
 

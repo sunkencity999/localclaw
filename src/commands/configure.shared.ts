@@ -15,6 +15,7 @@ export const CONFIGURE_WIZARD_SECTIONS = [
   "daemon",
   "channels",
   "skills",
+  "integrations",
   "hooks",
   "routing",
   "health",
@@ -49,6 +50,11 @@ export const CONFIGURE_SECTION_OPTIONS: Array<{
     hint: "Link WhatsApp/Telegram/etc and defaults",
   },
   { value: "skills", label: "Skills", hint: "Install/enable workspace skills" },
+  {
+    value: "integrations",
+    label: "Integrations",
+    hint: "Connect Jira, Confluence, Slack",
+  },
   {
     value: "hooks",
     label: "Hooks",

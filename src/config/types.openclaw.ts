@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type { AgentBinding, AgentsConfig } from "./types.agents.js";
 import type { ApprovalsConfig } from "./types.approvals.js";
 import type { AuthConfig } from "./types.auth.js";
@@ -23,6 +24,9 @@ import type { NodeHostConfig } from "./types.node-host.js";
 import type { PluginsConfig } from "./types.plugins.js";
 import type { SkillsConfig } from "./types.skills.js";
 import type { ToolsConfig } from "./types.tools.js";
+import type { IntegrationsSchema } from "./zod-schema.integrations.js";
+
+export type IntegrationsConfig = z.infer<typeof IntegrationsSchema>;
 
 export type OpenClawConfig = {
   meta?: {
@@ -95,6 +99,7 @@ export type OpenClawConfig = {
   canvasHost?: CanvasHostConfig;
   talk?: TalkConfig;
   gateway?: GatewayConfig;
+  integrations?: IntegrationsConfig;
 };
 
 export type ConfigValidationIssue = {

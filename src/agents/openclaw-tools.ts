@@ -7,10 +7,12 @@ import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createArchiveTool } from "./tools/archive-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
+import { createConfluenceTool } from "./tools/confluence-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createGitTool } from "./tools/git-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
+import { createJiraTool } from "./tools/jira-tool.js";
 import { createMediaTool } from "./tools/media-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNetworkTool } from "./tools/network-tool.js";
@@ -24,6 +26,7 @@ import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
+import { createSlackIntegrationTool } from "./tools/slack-integration-tool.js";
 import { createTmuxTool } from "./tools/tmux-tool.js";
 import { createTranscribeTool } from "./tools/transcribe-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
@@ -159,6 +162,13 @@ export function createOpenClawTools(options?: {
     createArchiveTool(),
     createNetworkTool(),
   ];
+
+  const jiraTool = createJiraTool({ config: options?.config });
+  if (jiraTool) tools.push(jiraTool);
+  const confluenceTool = createConfluenceTool({ config: options?.config });
+  if (confluenceTool) tools.push(confluenceTool);
+  const slackIntegrationTool = createSlackIntegrationTool({ config: options?.config });
+  if (slackIntegrationTool) tools.push(slackIntegrationTool);
 
   const pluginTools = resolvePluginTools({
     context: {

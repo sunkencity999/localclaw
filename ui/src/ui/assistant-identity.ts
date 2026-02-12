@@ -23,7 +23,7 @@ export function resolveProductName(): string {
   if (typeof window !== "undefined" && window.__OPENCLAW_PRODUCT_NAME__) {
     return window.__OPENCLAW_PRODUCT_NAME__;
   }
-  return "OpenClaw";
+  return "LocalClaw";
 }
 
 export function resolveCliName(): string {

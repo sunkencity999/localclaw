@@ -21,7 +21,7 @@ describe("memory search config", () => {
     expect(resolved).toBeNull();
   });
 
-  it("defaults provider to auto when unspecified", () => {
+  it("defaults provider to local when unspecified", () => {
     const cfg = {
       agents: {
         defaults: {
@@ -32,7 +32,7 @@ describe("memory search config", () => {
       },
     };
     const resolved = resolveMemorySearchConfig(cfg, "main");
-    expect(resolved?.provider).toBe("auto");
+    expect(resolved?.provider).toBe("local");
     expect(resolved?.fallback).toBe("none");
   });
 

@@ -129,6 +129,234 @@ All tools use JSON schema parameters and return structured results with both hum
 
 ---
 
+## Third-Party Integrations (Jira, Confluence, Slack)
+
+LocalClaw includes built-in integrations for **Jira**, **Confluence**, and **Slack** that give the agent direct, structured access to your team's project management, documentation, and communication tools. All API calls run locally from your machine — no intermediary cloud services.
+
+### Quick Setup
+
+The fastest way to configure integrations is the interactive wizard:
+
+```bash
+localclaw configure --section integrations
+```
+
+This walks you through enabling each integration, entering credentials, and setting defaults. You can also select **Integrations** from the main `localclaw configure` menu.
+
+Alternatively, edit your config file directly at `~/.localclaw/openclaw.local.json` (see [Manual Configuration](#manual-configuration) below).
+
+### Jira Integration
+
+Connect your Jira Cloud or Jira Server instance to let the agent manage issues, track projects, and automate workflows.
+
+#### Capabilities
+
+| Action | Description |
+|--------|-------------|
+| **Search issues** | Query issues using JQL (Jira Query Language) with pagination |
+| **Get issue details** | Retrieve full issue data — summary, status, assignee, priority, type, timestamps |
+| **Create issues** | Create new issues with summary, description, type, assignee, priority, and labels |
+| **Add comments** | Post comments on existing issues (Atlassian Document Format) |
+| **Transition issues** | Move issues through workflow states (e.g. To Do → In Progress → Done) |
+| **List transitions** | Discover available workflow transitions for any issue |
+
+#### Prerequisites
+
+1. A Jira Cloud or Jira Server instance
+2. An Atlassian account email address
+3. A Jira API token — generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+
+#### Configuration
+
+```json5
+{
+  integrations: {
+    jira: {
+      enabled: true,
+      baseUrl: "https://yourteam.atlassian.net",  // Your Jira instance URL
+      email: "you@example.com",                    // Atlassian account email
+      apiToken: "ATATT3x...",                      // API token (kept secret)
+      defaultProject: "PROJ",                      // Optional: default project key for new issues
+      timeoutSeconds: 30,                          // Optional: API request timeout (default: 30)
+      maxResults: 50,                              // Optional: max search results (default: 50)
+    },
+  },
+}
+```
+
+#### Example Agent Interactions
+
+- *"Show me all open bugs assigned to me in the PROJ project"* — agent runs a JQL search and returns matching issues
+- *"Create a task in PROJ: Upgrade Node to v22 with high priority"* — agent creates the issue and returns the new key
+- *"Move PROJ-123 to In Progress and add a comment that I'm starting work"* — agent transitions the issue and posts the comment
+- *"What's the status of PROJ-456?"* — agent fetches the issue and summarizes its state
+
+---
+
+### Confluence Integration
+
+Connect your Confluence Cloud or Server instance to let the agent search, read, create, and update wiki pages and documentation.
+
+#### Capabilities
+
+| Action | Description |
+|--------|-------------|
+| **Search content** | Query pages using CQL (Confluence Query Language) with pagination |
+| **Get page details** | Retrieve page metadata — title, space, status, version, timestamps, web URL |
+| **Read page body** | Fetch the full storage-format body of any page |
+| **Create pages** | Create new pages in a space with HTML body content, optional parent page |
+| **Update pages** | Update existing pages with new title, body, and automatic version increment |
+| **List spaces** | Enumerate available Confluence spaces with name, key, and type |
+
+#### Prerequisites
+
+1. A Confluence Cloud or Confluence Server instance
+2. An Atlassian account email address
+3. An API token — the same token used for Jira works if you're on Atlassian Cloud
+
+#### Configuration
+
+```json5
+{
+  integrations: {
+    confluence: {
+      enabled: true,
+      baseUrl: "https://yourteam.atlassian.net",  // Your Confluence instance URL
+      email: "you@example.com",                    // Atlassian account email
+      apiToken: "ATATT3x...",                      // API token (kept secret)
+      defaultSpace: "TEAM",                        // Optional: default space key for new pages
+      timeoutSeconds: 30,                          // Optional: API request timeout (default: 30)
+      maxResults: 25,                              // Optional: max search results (default: 25)
+    },
+  },
+}
+```
+
+#### Example Agent Interactions
+
+- *"Find all pages in the TEAM space mentioning deployment procedures"* — agent searches Confluence and returns matching pages with links
+- *"Read the content of page 12345678"* — agent fetches and displays the full page body
+- *"Create a new page in TEAM called 'Q3 Retrospective' with a summary of our last sprint"* — agent creates the page and returns its URL
+- *"Update the 'API Reference' page with the new endpoint documentation"* — agent fetches the current version, updates the body, and increments the version number
+- *"What spaces are available in our Confluence?"* — agent lists all spaces with their keys and names
+
+---
+
+### Slack Integration
+
+Connect Slack to let the agent post messages, read channel history, search conversations, and interact with your team's workspace as a tool.
+
+> **Note:** This is the Slack *integration* (agent tool for reading/writing Slack). It is separate from the Slack *channel* (which routes incoming Slack messages to the agent). You can use both simultaneously.
+
+#### Capabilities
+
+| Action | Description |
+|--------|-------------|
+| **Post messages** | Send messages to any channel or thread, with link unfurling control |
+| **Channel history** | Read recent messages from any channel the bot is a member of |
+| **Thread replies** | Fetch all replies in a specific thread |
+| **Search messages** | Full-text search across the workspace, sorted by relevance or timestamp |
+| **List channels** | Enumerate public and private channels with topic, purpose, and membership |
+| **User lookup** | Resolve user IDs to names, real names, emails, and bot status |
+| **Add reactions** | React to messages with emoji |
+| **Set channel topic** | Update the topic of a channel |
+
+#### Prerequisites
+
+1. A Slack workspace where you can install apps
+2. A **Slack App** with a Bot User — create one at [https://api.slack.com/apps](https://api.slack.com/apps)
+3. A **Bot User OAuth Token** (`xoxb-...`) — required for all operations
+
+**Required bot token scopes** (add these in your Slack App's OAuth & Permissions page):
+
+| Scope | Used for |
+|-------|----------|
+| `chat:write` | Posting messages |
+| `channels:history` | Reading public channel history |
+| `channels:read` | Listing public channels |
+| `groups:history` | Reading private channel history |
+| `groups:read` | Listing private channels |
+| `search:read` | Searching messages |
+| `users:read` | Looking up user info |
+| `users:read.email` | Reading user email addresses |
+| `reactions:write` | Adding emoji reactions |
+| `channels:manage` | Setting channel topics |
+
+**Optional tokens:**
+
+- **App-Level Token** (`xapp-...`) — needed only if you use Slack Socket Mode
+- **Signing Secret** — needed only if you receive webhook events from Slack
+
+#### Configuration
+
+```json5
+{
+  integrations: {
+    slack: {
+      enabled: true,
+      botToken: "xoxb-1234-5678-abcdef",    // Bot User OAuth Token (required)
+      appToken: "xapp-1-A0B1C2-...",         // Optional: App-Level Token for Socket Mode
+      signingSecret: "a1b2c3d4e5f6...",      // Optional: for webhook verification
+      defaultChannel: "#general",             // Optional: default channel for posting
+      timeoutSeconds: 30,                     // Optional: API request timeout (default: 30)
+    },
+  },
+}
+```
+
+#### Example Agent Interactions
+
+- *"Post a message to #engineering: Deployment complete for v2.1.0"* — agent posts the message and confirms delivery
+- *"What's been discussed in #product today?"* — agent fetches recent channel history and summarizes
+- *"Search Slack for messages about the database migration"* — agent searches across channels and returns matching messages
+- *"Who is user U01234ABCDE?"* — agent looks up the user and returns their name and email
+- *"Reply to the thread in #ops about the outage with an update"* — agent posts a threaded reply
+- *"React to the last message in #general with :thumbsup:"* — agent adds the emoji reaction
+
+---
+
+### Manual Configuration
+
+All three integrations can be configured in a single `integrations` block in your config file (`~/.localclaw/openclaw.local.json`):
+
+```json5
+{
+  // ... other config ...
+  integrations: {
+    jira: {
+      enabled: true,
+      baseUrl: "https://yourteam.atlassian.net",
+      email: "you@example.com",
+      apiToken: "ATATT3x...",
+      defaultProject: "PROJ",
+    },
+    confluence: {
+      enabled: true,
+      baseUrl: "https://yourteam.atlassian.net",
+      email: "you@example.com",
+      apiToken: "ATATT3x...",
+      defaultSpace: "TEAM",
+    },
+    slack: {
+      enabled: true,
+      botToken: "xoxb-...",
+      defaultChannel: "#general",
+    },
+  },
+}
+```
+
+> **Tip:** If you use Atlassian Cloud, the `baseUrl`, `email`, and `apiToken` are the same for both Jira and Confluence. You only need to generate one API token.
+
+### Security Notes
+
+- API tokens and bot tokens are stored in your local config file (`~/.localclaw/openclaw.local.json`). The file is local to your machine and never transmitted.
+- Token fields are marked as **sensitive** in the configuration UI and CLI — they are masked in the dashboard and wizard output.
+- All API requests are made directly from your machine to the respective service endpoints. No data passes through any intermediary.
+- You can disable any integration at any time by setting `enabled: false` or by running `localclaw configure --section integrations`.
+
+---
+
 ## Smart Context Management for Small Models
 
 Local models typically have much smaller context windows (8K-32K tokens) compared to cloud models (128K-200K+). LocalClaw includes a multi-layered context management system designed to deliver a great agentic experience even within these constraints. **All of this is automatic** — no configuration needed.

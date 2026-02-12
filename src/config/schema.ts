@@ -67,6 +67,7 @@ const GROUP_LABELS: Record<string, string> = {
   talk: "Talk",
   channels: "Messaging Channels",
   skills: "Skills",
+  integrations: "Integrations",
   plugins: "Plugins",
   discovery: "Discovery",
   presence: "Presence",
@@ -93,6 +94,7 @@ const GROUP_ORDER: Record<string, number> = {
   browser: 130,
   talk: 140,
   channels: 150,
+  integrations: 195,
   skills: 200,
   plugins: 205,
   discovery: 210,
@@ -364,6 +366,29 @@ const FIELD_LABELS: Record<string, string> = {
   "plugins.installs.*.installPath": "Plugin Install Path",
   "plugins.installs.*.version": "Plugin Install Version",
   "plugins.installs.*.installedAt": "Plugin Install Time",
+  "integrations.jira": "Jira",
+  "integrations.jira.enabled": "Enable Jira Integration",
+  "integrations.jira.baseUrl": "Jira Base URL",
+  "integrations.jira.email": "Jira Email",
+  "integrations.jira.apiToken": "Jira API Token",
+  "integrations.jira.defaultProject": "Default Jira Project",
+  "integrations.jira.timeoutSeconds": "Jira Timeout (sec)",
+  "integrations.jira.maxResults": "Jira Max Results",
+  "integrations.confluence": "Confluence",
+  "integrations.confluence.enabled": "Enable Confluence Integration",
+  "integrations.confluence.baseUrl": "Confluence Base URL",
+  "integrations.confluence.email": "Confluence Email",
+  "integrations.confluence.apiToken": "Confluence API Token",
+  "integrations.confluence.defaultSpace": "Default Confluence Space",
+  "integrations.confluence.timeoutSeconds": "Confluence Timeout (sec)",
+  "integrations.confluence.maxResults": "Confluence Max Results",
+  "integrations.slack": "Slack (Integration)",
+  "integrations.slack.enabled": "Enable Slack Integration",
+  "integrations.slack.botToken": "Slack Bot Token",
+  "integrations.slack.appToken": "Slack App Token",
+  "integrations.slack.signingSecret": "Slack Signing Secret",
+  "integrations.slack.defaultChannel": "Default Slack Channel",
+  "integrations.slack.timeoutSeconds": "Slack Timeout (sec)",
 };
 
 const FIELD_HELP: Record<string, string> = {
@@ -682,6 +707,36 @@ const FIELD_HELP: Record<string, string> = {
     "Optional PluralKit token for resolving private systems or members.",
   "channels.slack.dm.policy":
     'Direct message access control ("pairing" recommended). "open" requires channels.slack.dm.allowFrom=["*"].',
+  "integrations.jira.enabled":
+    "Enable Jira Cloud/Server integration for issue tracking and project management.",
+  "integrations.jira.baseUrl": "Your Jira instance URL (e.g. https://yourteam.atlassian.net).",
+  "integrations.jira.email": "Email address associated with your Jira API token.",
+  "integrations.jira.apiToken":
+    "Jira API token (generate at https://id.atlassian.com/manage-profile/security/api-tokens).",
+  "integrations.jira.defaultProject": "Default project key for creating issues (e.g. PROJ).",
+  "integrations.jira.timeoutSeconds": "Timeout in seconds for Jira API requests (default: 30).",
+  "integrations.jira.maxResults": "Maximum results returned by Jira searches (default: 50).",
+  "integrations.confluence.enabled":
+    "Enable Confluence Cloud/Server integration for wiki and documentation.",
+  "integrations.confluence.baseUrl":
+    "Your Confluence instance URL (e.g. https://yourteam.atlassian.net).",
+  "integrations.confluence.email": "Email address associated with your Confluence API token.",
+  "integrations.confluence.apiToken":
+    "Confluence API token (same as Jira if using Atlassian Cloud).",
+  "integrations.confluence.defaultSpace": "Default space key for creating pages (e.g. TEAM).",
+  "integrations.confluence.timeoutSeconds":
+    "Timeout in seconds for Confluence API requests (default: 30).",
+  "integrations.confluence.maxResults":
+    "Maximum results returned by Confluence searches (default: 25).",
+  "integrations.slack.enabled":
+    "Enable Slack integration for posting messages and searching channels as a tool.",
+  "integrations.slack.botToken":
+    "Slack Bot User OAuth Token (xoxb-...). Required for posting and reading messages.",
+  "integrations.slack.appToken": "Slack App-Level Token (xapp-...). Required for Socket Mode.",
+  "integrations.slack.signingSecret": "Slack Signing Secret for verifying webhook requests.",
+  "integrations.slack.defaultChannel":
+    "Default channel name or ID for posting messages (e.g. #general or C01234ABCDE).",
+  "integrations.slack.timeoutSeconds": "Timeout in seconds for Slack API requests (default: 30).",
 };
 
 const FIELD_PLACEHOLDERS: Record<string, string> = {
@@ -691,6 +746,15 @@ const FIELD_PLACEHOLDERS: Record<string, string> = {
   "gateway.controlUi.basePath": "/openclaw",
   "channels.mattermost.baseUrl": "https://chat.example.com",
   "agents.list[].identity.avatar": "avatars/openclaw.png",
+  "integrations.jira.baseUrl": "https://yourteam.atlassian.net",
+  "integrations.jira.email": "you@example.com",
+  "integrations.jira.defaultProject": "PROJ",
+  "integrations.confluence.baseUrl": "https://yourteam.atlassian.net",
+  "integrations.confluence.email": "you@example.com",
+  "integrations.confluence.defaultSpace": "TEAM",
+  "integrations.slack.botToken": "xoxb-...",
+  "integrations.slack.appToken": "xapp-...",
+  "integrations.slack.defaultChannel": "#general",
 };
 
 const SENSITIVE_PATTERNS = [/token/i, /password/i, /secret/i, /api.?key/i];

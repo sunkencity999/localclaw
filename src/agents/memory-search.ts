@@ -124,7 +124,7 @@ function mergeConfig(
   const enabled = overrides?.enabled ?? defaults?.enabled ?? true;
   const sessionMemory =
     overrides?.experimental?.sessionMemory ?? defaults?.experimental?.sessionMemory ?? false;
-  const provider = overrides?.provider ?? defaults?.provider ?? "auto";
+  const provider = overrides?.provider ?? defaults?.provider ?? "local";
   const defaultRemote = defaults?.remote;
   const overrideRemote = overrides?.remote;
   const hasRemoteConfig = Boolean(
@@ -135,8 +135,7 @@ function mergeConfig(
     defaultRemote?.apiKey ||
     defaultRemote?.headers,
   );
-  const includeRemote =
-    hasRemoteConfig || provider === "openai" || provider === "gemini" || provider === "auto";
+  const includeRemote = hasRemoteConfig || provider === "openai" || provider === "gemini";
   const batch = {
     enabled: overrideRemote?.batch?.enabled ?? defaultRemote?.batch?.enabled ?? true,
     wait: overrideRemote?.batch?.wait ?? defaultRemote?.batch?.wait ?? true,

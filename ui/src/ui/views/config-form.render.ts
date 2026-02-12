@@ -216,6 +216,14 @@ const sectionIcons = {
       <line x1="8" y1="23" x2="16" y2="23"></line>
     </svg>
   `,
+  integrations: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M4 6h16M4 12h16M4 18h16"></path>
+      <circle cx="8" cy="6" r="1.5"></circle>
+      <circle cx="16" cy="12" r="1.5"></circle>
+      <circle cx="10" cy="18" r="1.5"></circle>
+    </svg>
+  `,
   plugins: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M12 2v6"></path>
@@ -271,6 +279,10 @@ export const SECTION_META: Record<string, { label: string; description: string }
   discovery: { label: "Discovery", description: "Service discovery and networking" },
   canvasHost: { label: "Canvas Host", description: "Canvas rendering and display" },
   talk: { label: "Talk", description: "Voice and speech settings" },
+  integrations: {
+    label: "Integrations",
+    description: "Third-party service integrations (Jira, Confluence, Slack)",
+  },
   plugins: { label: "Plugins", description: "Plugin management and extensions" },
 };
 

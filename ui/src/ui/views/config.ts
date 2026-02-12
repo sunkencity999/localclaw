@@ -242,6 +242,14 @@ const sidebarIcons = {
       <line x1="8" y1="23" x2="16" y2="23"></line>
     </svg>
   `,
+  integrations: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 6h16M4 12h16M4 18h16"></path>
+      <circle cx="8" cy="6" r="1.5"></circle>
+      <circle cx="16" cy="12" r="1.5"></circle>
+      <circle cx="10" cy="18" r="1.5"></circle>
+    </svg>
+  `,
   plugins: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M12 2v6"></path>
@@ -274,6 +282,7 @@ const SECTIONS: Array<{ key: string; label: string }> = [
   { key: "hooks", label: "Hooks" },
   { key: "skills", label: "Skills" },
   { key: "tools", label: "Tools" },
+  { key: "integrations", label: "Integrations" },
   { key: "gateway", label: "Gateway" },
   { key: "wizard", label: "Setup Wizard" },
 ];
