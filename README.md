@@ -102,6 +102,31 @@ Stored at `memory/user-preferences.json` and available for other hooks to person
 - **Diagram Pipeline** — detects Mermaid code blocks in agent output and renders them to SVG (via `mmdc`) or saves `.mmd` source files
 - **Voice Pipeline** — STT via `whisper-cpp`, TTS via macOS `say`, with automatic capability detection
 
+### Native Core Skills (Built-in Agent Tools)
+
+LocalClaw ships with **10 native agent tools** that give the AI structured, typed access to local system capabilities — no external skill files or shell command composition needed. Every tool runs entirely on your machine with zero cloud dependency.
+
+| Tool | Description | Key Actions |
+|------|-------------|-------------|
+| **`resource_monitor`** | Real-time system health | CPU, memory, disk usage, top processes, system load |
+| **`run_history`** | Persistent command history | Query past executions, filter by status/time, stats, JSONL-backed |
+| **`tmux`** | Terminal session manager | Create sessions, send keys, capture output, wait for text patterns |
+| **`pdf`** | PDF read and edit | Extract text, metadata, merge/split PDFs, add text stamps, remove pages |
+| **`office`** | Office document I/O | Read/create DOCX, read XLSX/PPTX, create spreadsheets with auto-formatting |
+| **`media`** | Video/audio processing | Extract frames/clips/audio, probe metadata, thumbnails, transcode (via ffmpeg) |
+| **`transcribe`** | Offline speech-to-text | Local transcription via whisper-cpp, audio format conversion, capability detection |
+| **`git`** | Structured git queries | Status, log, diff, branch, stash, show, blame, remote — all parsed and typed |
+| **`archive`** | Compression and archives | Create/extract/list ZIP and TAR (gz/bz2/xz/zst), gzip/gunzip single files |
+| **`network`** | Network diagnostics | Ping, DNS lookup, port scan, HTTP check, traceroute, interfaces, listening ports |
+
+All tools use JSON schema parameters and return structured results with both human-readable text and machine-parseable details. The agent selects the right tool automatically based on your request.
+
+**Optional system dependencies:** Some tools wrap system binaries when available:
+- `ffmpeg` — required by `media` and `transcribe` (audio conversion). Install: `brew install ffmpeg`
+- `whisper-cpp` — required by `transcribe` for local STT. Install: `brew install whisper-cpp`
+- `tmux` — required by `tmux` tool. Install: `brew install tmux`
+- `tar` — used by `archive` for tar operations (pre-installed on macOS/Linux)
+
 ---
 
 ## Smart Context Management for Small Models
@@ -338,7 +363,7 @@ LocalClaw inherits the full OpenClaw platform. Every command and feature works �
 - **[Browser control](https://docs.openclaw.ai/tools/browser)** — dedicated Chrome/Chromium with CDP control
 - **[Skills](https://docs.openclaw.ai/tools/skills)** — bundled, managed, and workspace skills
 - **[Agent sessions](https://docs.openclaw.ai/concepts/session)** — multi-session with agent-to-agent coordination
-- **[Tools](https://docs.openclaw.ai/tools)** — bash, browser, canvas, cron, nodes, and more
+- **[Tools](https://docs.openclaw.ai/tools)** — bash, browser, canvas, cron, nodes, plus 10 native Core Skills (PDF, Office, media, git, network, and more)
 
 For the full feature reference, see the [OpenClaw docs](https://docs.openclaw.ai).
 
