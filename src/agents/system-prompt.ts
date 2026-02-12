@@ -246,6 +246,11 @@ export function buildAgentSystemPrompt(params: {
     session_status:
       "Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (📊 session_status); optional per-session model override",
     image: "Analyze an image with the configured image model",
+    jira: "Jira integration: search issues (JQL), get/create/transition issues, add comments. Call this tool directly for any Jira request.",
+    confluence:
+      "Confluence integration: search pages (CQL), get/create/update pages, list spaces. Call this tool directly for any Confluence request.",
+    slack_integration:
+      "Slack integration: post messages, read channel history, search messages, list channels, lookup users. Call this tool directly for any Slack workspace request.",
   };
 
   const toolOrder = [
@@ -272,6 +277,9 @@ export function buildAgentSystemPrompt(params: {
     "sessions_send",
     "session_status",
     "image",
+    "jira",
+    "confluence",
+    "slack_integration",
   ];
 
   const rawToolNames = (params.toolNames ?? []).map((tool) => tool.trim());
