@@ -13,6 +13,7 @@ import { createGitTool } from "./tools/git-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createMediaTool } from "./tools/media-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
+import { createNetworkTool } from "./tools/network-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createOfficeTool } from "./tools/office-tool.js";
 import { createPdfTool } from "./tools/pdf-tool.js";
@@ -156,6 +157,7 @@ export function createOpenClawTools(options?: {
     createTranscribeTool(),
     createGitTool(),
     createArchiveTool(),
+    createNetworkTool(),
   ];
 
   const pluginTools = resolvePluginTools({
