@@ -2,6 +2,7 @@ import chalk from "chalk";
 import type { loadConfig } from "../config/config.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { resolveConfiguredModelRef } from "../agents/model-selection.js";
+import { warmUpOllamaModel } from "./ollama-warmup.js";
 
 type Log = {
   info: (msg: string, meta?: Record<string, unknown>) => void;
@@ -183,14 +184,19 @@ export async function runStartupHealthCheck(params: {
     return result;
   }
 
-  // 3. Report success with context window
+  // 3. For Ollama, pre-warm the model so the first agent request is fast
+  if (provider.toLowerCase() === "ollama") {
+    void warmUpOllamaModel({ model, log: params.log });
+  }
+
+  // 4. Report success with context window
   const ctxStr = modelCheck.contextWindow
     ? ` ${chalk.dim(`(context: ${(modelCheck.contextWindow / 1024).toFixed(0)}K tokens)`)}`
     : "";
   params.log.info(
     `health: model "${model}" available${modelCheck.contextWindow ? ` (context: ${modelCheck.contextWindow} tokens)` : ""}`,
     {
-      consoleMessage: `${chalk.green("✓")} model ${chalk.whiteBright(model)} available${ctxStr}`,
+      consoleMessage: `${chalk.green("\u2713")} model ${chalk.whiteBright(model)} available${ctxStr}`,
     },
   );
 
