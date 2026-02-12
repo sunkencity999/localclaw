@@ -22,12 +22,22 @@ declare module "pdfjs-dist/legacy/build/pdf.mjs" {
     render(params: { canvas: unknown; viewport: Viewport }): { promise: Promise<void> };
   };
 
+  export type PDFMetadata = {
+    info: Record<string, unknown>;
+    metadata: { getAll(): Record<string, unknown> } | null;
+  };
+
   export type PDFDocumentProxy = {
     numPages: number;
     getPage(pageNumber: number): Promise<PDFPageProxy>;
+    getMetadata(): Promise<PDFMetadata>;
   };
 
-  export function getDocument(params: { data: Uint8Array; disableWorker?: boolean }): {
+  export function getDocument(params: {
+    data: Uint8Array;
+    disableWorker?: boolean;
+    useSystemFonts?: boolean;
+  }): {
     promise: Promise<PDFDocumentProxy>;
   };
 }
