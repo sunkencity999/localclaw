@@ -81,7 +81,13 @@ export class ConfluenceClient {
       signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
+      const raw = await response.text().catch(() => "");
+      // Strip HTML and truncate so error messages don't flood the model's context.
+      const cleaned = raw
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const body = cleaned.length > 300 ? `${cleaned.slice(0, 300)}…` : cleaned;
       throw new Error(`Confluence API error ${response.status}: ${body}`);
     }
     return response.json() as Promise<T>;
