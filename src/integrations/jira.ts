@@ -209,13 +209,19 @@ export class JiraClient {
         issuetype: { name: params.issueType ?? "Task" },
         ...(params.description
           ? {
-              description: {
-                type: "doc",
-                version: 1,
-                content: [
-                  { type: "paragraph", content: [{ type: "text", text: params.description }] },
-                ],
-              },
+              description:
+                this.apiVersion === "2"
+                  ? params.description
+                  : {
+                      type: "doc",
+                      version: 1,
+                      content: [
+                        {
+                          type: "paragraph",
+                          content: [{ type: "text", text: params.description }],
+                        },
+                      ],
+                    },
             }
           : {}),
         ...(params.assignee ? { assignee: { accountId: params.assignee } } : {}),
@@ -230,15 +236,17 @@ export class JiraClient {
   }
 
   async addComment(issueKey: string, comment: string): Promise<{ id: string }> {
+    const commentBody =
+      this.apiVersion === "2"
+        ? comment
+        : {
+            type: "doc",
+            version: 1,
+            content: [{ type: "paragraph", content: [{ type: "text", text: comment }] }],
+          };
     return this.request<{ id: string }>(`/issue/${encodeURIComponent(issueKey)}/comment`, {
       method: "POST",
-      body: JSON.stringify({
-        body: {
-          type: "doc",
-          version: 1,
-          content: [{ type: "paragraph", content: [{ type: "text", text: comment }] }],
-        },
-      }),
+      body: JSON.stringify({ body: commentBody }),
     });
   }
 
@@ -247,18 +255,16 @@ export class JiraClient {
       transition: { id: params.transitionId },
     };
     if (params.comment) {
+      const commentBody =
+        this.apiVersion === "2"
+          ? params.comment
+          : {
+              type: "doc",
+              version: 1,
+              content: [{ type: "paragraph", content: [{ type: "text", text: params.comment }] }],
+            };
       body.update = {
-        comment: [
-          {
-            add: {
-              body: {
-                type: "doc",
-                version: 1,
-                content: [{ type: "paragraph", content: [{ type: "text", text: params.comment }] }],
-              },
-            },
-          },
-        ],
+        comment: [{ add: { body: commentBody } }],
       };
     }
     await this.request(`/issue/${encodeURIComponent(params.issueKey)}/transitions`, {
