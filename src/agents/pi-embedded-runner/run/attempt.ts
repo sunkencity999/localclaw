@@ -372,6 +372,7 @@ export async function runEmbeddedAttempt(
       messageToolHints,
       sandboxInfo,
       skipSilentReplies: params.config?.gateway?.mode === "local",
+      contextBudgetChars: undefined,
       tools,
       modelAliasLines: buildModelAliasLines(params.config),
       userTimezone,
@@ -457,7 +458,6 @@ export async function runEmbeddedAttempt(
         tools,
         sandboxEnabled: !!sandbox?.enabled,
       });
-
       // Add client tools (OpenResponses hosted tools) to customTools
       let clientToolCallDetected: { name: string; params: Record<string, unknown> } | null = null;
       const clientToolDefs = params.clientTools

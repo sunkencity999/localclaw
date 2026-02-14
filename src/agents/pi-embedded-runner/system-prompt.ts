@@ -42,6 +42,8 @@ export function buildEmbeddedSystemPrompt(params: {
   sandboxInfo?: EmbeddedSandboxInfo;
   /** Skip the Silent Replies (NO_REPLY) section for local models. */
   skipSilentReplies?: boolean;
+  /** Total character budget for injected context files (local model optimization). */
+  contextBudgetChars?: number;
   tools: AgentTool[];
   modelAliasLines: string[];
   userTimezone: string;
@@ -67,6 +69,7 @@ export function buildEmbeddedSystemPrompt(params: {
     messageToolHints: params.messageToolHints,
     sandboxInfo: params.sandboxInfo,
     skipSilentReplies: params.skipSilentReplies,
+    contextBudgetChars: params.contextBudgetChars,
     toolNames: params.tools.map((tool) => tool.name),
     toolSummaries: buildToolSummaryMap(params.tools),
     modelAliasLines: params.modelAliasLines,

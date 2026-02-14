@@ -213,6 +213,12 @@ export function buildAgentSystemPrompt(params: {
   };
   /** Skip the Silent Replies (NO_REPLY) section — useful for local models that misuse it. */
   skipSilentReplies?: boolean;
+  /** Total character budget for all injected context files combined.
+   *  When set, files are included in order until the budget is exhausted;
+   *  remaining files are replaced with a one-line stub directing the model
+   *  to read them via the `read` tool.  Useful for local models where the
+   *  combined system-prompt + tool-definition payload must stay compact. */
+  contextBudgetChars?: number;
   /** Reaction guidance for the agent (for Telegram minimal/extensive modes). */
   reactionGuidance?: {
     level: "minimal" | "extensive";
@@ -246,11 +252,6 @@ export function buildAgentSystemPrompt(params: {
     session_status:
       "Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (📊 session_status); optional per-session model override",
     image: "Analyze an image with the configured image model",
-    jira: "Jira integration: search issues (JQL), get/create/transition issues, add comments. Call this tool directly for any Jira request.",
-    confluence:
-      "Confluence integration: search pages (CQL), get/create/update pages, list spaces. Call this tool directly for any Confluence request.",
-    slack_integration:
-      "Slack integration: post messages, read channel history, search messages, list channels, lookup users. Call this tool directly for any Slack workspace request.",
   };
 
   const toolOrder = [
@@ -277,9 +278,6 @@ export function buildAgentSystemPrompt(params: {
     "sessions_send",
     "session_status",
     "image",
-    "jira",
-    "confluence",
-    "slack_integration",
   ];
 
   const rawToolNames = (params.toolNames ?? []).map((tool) => tool.trim());
@@ -559,7 +557,27 @@ export function buildAgentSystemPrompt(params: {
       );
     }
     lines.push("");
-    for (const file of contextFiles) {
+    const budget = params.contextBudgetChars;
+    // When budget-constrained (local models), sort smallest-first so critical
+    // identity files (IDENTITY.md, USER.md, SOUL.md) are included before large
+    // files like AGENTS.md consume the entire budget.
+    const orderedFiles =
+      budget != null
+        ? [...contextFiles].sort((a, b) => a.content.length - b.content.length)
+        : contextFiles;
+    let usedChars = 0;
+    for (const file of orderedFiles) {
+      const entry = `## ${file.path}\n\n${file.content}\n`;
+      if (budget != null && usedChars + entry.length > budget) {
+        lines.push(
+          `## ${file.path}`,
+          "",
+          `[Read ${file.path} via the read tool for full content]`,
+          "",
+        );
+        continue;
+      }
+      usedChars += entry.length;
       lines.push(`## ${file.path}`, "", file.content, "");
     }
   }

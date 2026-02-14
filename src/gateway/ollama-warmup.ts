@@ -15,21 +15,39 @@ const OLLAMA_API_BASE = "http://127.0.0.1:11434";
 const OLLAMA_KEEP_ALIVE = "24h";
 
 /**
+ * Minimum context window (tokens) required for agent tool calling.
+ *
+ * Agents need ~7K tokens for the system prompt, ~15K for tool schemas, and
+ * headroom for conversation history, so 32768 is a practical minimum.
+ *
+ * Ollama's OpenAI-compatible endpoint (/v1/chat/completions) always uses the
+ * model's Modelfile default num_ctx — per-request overrides are ignored.
+ * If the model's default is below this threshold, we update the Modelfile
+ * parameters via /api/create so all endpoints use the right context window.
+ */
+const OLLAMA_MIN_NUM_CTX = 131_072;
+
+/**
  * Pre-warm an Ollama model so the first real agent request is fast.
  *
- * Sends a minimal /api/generate request with:
- * - `keep_alive` set high so the model stays resident in memory
- * - `num_predict: 1` to minimise work — we only care about loading the model
- *
- * The model's full context window is preserved (no num_ctx override) because
- * agents need large context for tool schemas, conversation history, and
- * multi-step reasoning chains.
+ * 1. Checks the model's default num_ctx via /api/show.
+ * 2. If num_ctx is below OLLAMA_MIN_NUM_CTX, updates the model's Modelfile
+ *    parameters via /api/create (non-destructive — same weights, just params).
+ * 3. Sends a minimal /api/generate request with keep_alive set high to
+ *    keep the model resident in memory.
  *
  * Also checks whether flash attention is enabled and logs a recommendation
  * if it is not.
  */
 export async function warmUpOllamaModel(params: { model: string; log: Log }): Promise<void> {
   const { model, log } = params;
+
+  try {
+    await ensureMinNumCtx({ model, log });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn(`ollama warm-up: failed to check/update num_ctx: ${msg}`);
+  }
 
   try {
     const res = await fetch(`${OLLAMA_API_BASE}/api/generate`, {
@@ -71,6 +89,72 @@ export async function warmUpOllamaModel(params: { model: string; log: Log }): Pr
   }
 
   checkFlashAttention(log);
+}
+
+/**
+ * Ensure the model's default num_ctx is at least OLLAMA_MIN_NUM_CTX.
+ *
+ * Ollama's /v1/chat/completions endpoint ignores per-request num_ctx overrides
+ * and always uses the Modelfile default.  If the default is too small for the
+ * agent's system prompt + tool schemas, we update it via /api/create.
+ */
+async function ensureMinNumCtx(params: { model: string; log: Log }): Promise<void> {
+  const { model, log } = params;
+  const showRes = await fetch(`${OLLAMA_API_BASE}/api/show`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: model }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!showRes.ok) return;
+
+  const showData = (await showRes.json()) as { parameters?: string };
+  const currentNumCtx = parseNumCtx(showData.parameters);
+
+  if (currentNumCtx != null && currentNumCtx >= OLLAMA_MIN_NUM_CTX) {
+    log.info(`ollama warm-up: model num_ctx=${currentNumCtx} (≥${OLLAMA_MIN_NUM_CTX}, ok)`);
+    return;
+  }
+
+  log.info(
+    `ollama warm-up: model num_ctx=${currentNumCtx ?? "unknown"} < ${OLLAMA_MIN_NUM_CTX}, updating model parameters`,
+    {
+      consoleMessage: `${chalk.cyan("⟳")} Updating Ollama model num_ctx ${chalk.dim(`${currentNumCtx ?? "?"} → ${OLLAMA_MIN_NUM_CTX}`)}`,
+    },
+  );
+
+  // Ollama 0.16+ uses `from` + `parameters` instead of the legacy `modelfile` string.
+  const createRes = await fetch(`${OLLAMA_API_BASE}/api/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      from: model,
+      parameters: { num_ctx: OLLAMA_MIN_NUM_CTX },
+      stream: false,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!createRes.ok) {
+    const body = await createRes.text().catch(() => "");
+    log.warn(`ollama warm-up: failed to update num_ctx (HTTP ${createRes.status}): ${body}`);
+    return;
+  }
+
+  // Consume response body
+  await createRes.text();
+
+  log.info(`ollama warm-up: model num_ctx updated to ${OLLAMA_MIN_NUM_CTX}`, {
+    consoleMessage: `${chalk.green("✓")} Ollama model num_ctx updated to ${OLLAMA_MIN_NUM_CTX}`,
+  });
+}
+
+/** Parse num_ctx from Ollama's /api/show parameters string. */
+function parseNumCtx(parameters: string | undefined): number | null {
+  if (!parameters) return null;
+  const match = /num_ctx\s+(\d+)/.exec(parameters);
+  return match ? Number(match[1]) : null;
 }
 
 /**

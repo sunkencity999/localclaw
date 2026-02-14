@@ -344,6 +344,7 @@ export async function compactEmbeddedPiSessionDirect(
       reactionGuidance,
       messageToolHints,
       sandboxInfo,
+      contextBudgetChars: undefined,
       tools,
       modelAliasLines: buildModelAliasLines(params.config),
       userTimezone,
