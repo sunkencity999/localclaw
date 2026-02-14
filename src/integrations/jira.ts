@@ -40,6 +40,8 @@ export type JiraTransitionParams = {
 
 export class JiraClient {
   private baseUrl: string;
+  private authType: "basic" | "pat";
+  private apiVersion: string;
   private email: string;
   private apiToken: string;
   private defaultProject: string | undefined;
@@ -50,14 +52,19 @@ export class JiraClient {
     if (!config.baseUrl) {
       throw new Error("Jira baseUrl is required");
     }
-    if (!config.email) {
-      throw new Error("Jira email is required");
-    }
     if (!config.apiToken) {
       throw new Error("Jira apiToken is required");
     }
+    const authType = config.authType ?? "basic";
+    if (authType === "basic" && !config.email) {
+      throw new Error(
+        "Jira email is required for basic auth (set authType to 'pat' for Personal Access Tokens)",
+      );
+    }
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-    this.email = config.email;
+    this.authType = authType;
+    this.apiVersion = config.apiVersion ?? (authType === "pat" ? "2" : "3");
+    this.email = config.email ?? "";
     this.apiToken = config.apiToken;
     this.defaultProject = config.defaultProject;
     this.timeoutMs = (config.timeoutSeconds ?? 30) * 1000;
@@ -65,16 +72,19 @@ export class JiraClient {
   }
 
   private get headers(): Record<string, string> {
-    const credentials = Buffer.from(`${this.email}:${this.apiToken}`).toString("base64");
+    const auth =
+      this.authType === "pat"
+        ? `Bearer ${this.apiToken}`
+        : `Basic ${Buffer.from(`${this.email}:${this.apiToken}`).toString("base64")}`;
     return {
-      Authorization: `Basic ${credentials}`,
+      Authorization: auth,
       "Content-Type": "application/json",
       Accept: "application/json",
     };
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}/rest/api/3${path}`;
+    const url = `${this.baseUrl}/rest/api/${this.apiVersion}${path}`;
     const response = await fetch(url, {
       ...options,
       headers: { ...this.headers, ...options?.headers },
