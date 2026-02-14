@@ -3,6 +3,14 @@ import type { JiraIntegrationSchema } from "../config/zod-schema.integrations.js
 
 export type JiraConfig = z.infer<typeof JiraIntegrationSchema>;
 
+export type JiraComment = {
+  id: string;
+  author: string | null;
+  body: string;
+  created: string | null;
+  updated: string | null;
+};
+
 export type JiraIssue = {
   key: string;
   summary: string;
@@ -13,6 +21,7 @@ export type JiraIssue = {
   issueType?: string | null;
   created?: string | null;
   updated?: string | null;
+  comments?: JiraComment[];
 };
 
 export type JiraSearchResult = {
@@ -154,19 +163,37 @@ export class JiraClient {
         issuetype?: { name: string } | null;
         created?: string;
         updated?: string;
+        comment?: {
+          comments?: Array<{
+            id: string;
+            author?: { displayName?: string } | null;
+            body?: unknown;
+            created?: string;
+            updated?: string;
+          }>;
+        };
       };
     }>(`/issue/${encodeURIComponent(issueKey)}`);
+
+    const comments = (result.fields.comment?.comments ?? []).map((c) => ({
+      id: c.id,
+      author: c.author?.displayName ?? null,
+      body: readableDescription(c.body),
+      created: c.created ?? null,
+      updated: c.updated ?? null,
+    }));
 
     return {
       key: result.key,
       summary: result.fields.summary,
       status: result.fields.status.name,
       assignee: result.fields.assignee?.displayName ?? null,
-      description: result.fields.description ? JSON.stringify(result.fields.description) : null,
+      description: readableDescription(result.fields.description),
       priority: result.fields.priority?.name ?? null,
       issueType: result.fields.issuetype?.name ?? null,
       created: result.fields.created ?? null,
       updated: result.fields.updated ?? null,
+      comments,
     };
   }
 
@@ -248,6 +275,34 @@ export class JiraClient {
     }>(`/issue/${encodeURIComponent(issueKey)}/transitions`);
     return result.transitions;
   }
+}
+
+/**
+ * Convert a Jira description/comment body to readable plain text.
+ * API v2 (Server): description is a plain string.
+ * API v3 (Cloud): description is ADF (Atlassian Document Format) JSON.
+ */
+function readableDescription(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return extractAdfText(value as AdfNode).trim();
+  }
+  return String(value);
+}
+
+type AdfNode = { type?: string; text?: string; content?: AdfNode[] };
+
+function extractAdfText(node: AdfNode): string {
+  if (node.type === "text") return node.text ?? "";
+  if (!node.content) return "";
+  const parts: string[] = [];
+  for (const child of node.content) {
+    parts.push(extractAdfText(child));
+  }
+  const joined = parts.join("");
+  const block = node.type === "paragraph" || node.type === "heading" || node.type === "listItem";
+  return block ? `${joined}\n` : joined;
 }
 
 export function createJiraClient(config: JiraConfig): JiraClient | null {

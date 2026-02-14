@@ -86,17 +86,25 @@ export function createJiraTool(options?: { config?: OpenClawConfig }): AnyAgentT
         case "get_issue": {
           const issueKey = readStringParam(params, "issueKey", { required: true });
           const issue = await client.getIssue(issueKey);
-          const text = [
-            `${issue.key}: ${issue.summary}`,
-            `Status: ${issue.status}`,
-            issue.assignee ? `Assignee: ${issue.assignee}` : null,
-            issue.priority ? `Priority: ${issue.priority}` : null,
-            issue.issueType ? `Type: ${issue.issueType}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n");
+          const lines: string[] = [`${issue.key}: ${issue.summary}`, `Status: ${issue.status}`];
+          if (issue.assignee) lines.push(`Assignee: ${issue.assignee}`);
+          if (issue.priority) lines.push(`Priority: ${issue.priority}`);
+          if (issue.issueType) lines.push(`Type: ${issue.issueType}`);
+          if (issue.created) lines.push(`Created: ${issue.created}`);
+          if (issue.updated) lines.push(`Updated: ${issue.updated}`);
+          if (issue.description) {
+            lines.push("", "--- Description ---", issue.description);
+          }
+          if (issue.comments && issue.comments.length > 0) {
+            lines.push("", `--- Comments (${issue.comments.length}) ---`);
+            for (const c of issue.comments) {
+              const author = c.author ?? "Unknown";
+              const date = c.created ? ` (${c.created})` : "";
+              lines.push(`\n[${author}${date}]`, c.body);
+            }
+          }
           return {
-            content: [{ type: "text", text }],
+            content: [{ type: "text", text: lines.join("\n") }],
             details: issue,
           };
         }
