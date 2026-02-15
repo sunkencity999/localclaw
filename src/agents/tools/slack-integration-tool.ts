@@ -8,6 +8,7 @@ const SLACK_INTEGRATION_ACTIONS = [
   "post_message",
   "channel_history",
   "thread_replies",
+  "list_dms",
   "search_messages",
   "list_channels",
   "lookup_user",
@@ -44,10 +45,12 @@ export function createSlackIntegrationTool(options?: {
     label: "Slack Integration",
     name: "slack_integration",
     description: [
-      "Slack integration for posting messages, reading channels, and searching conversations.",
-      "Actions: post_message, channel_history, thread_replies, search_messages,",
+      "Slack integration for posting messages, reading channels, DMs, and searching.",
+      "Actions: post_message, channel_history, thread_replies, list_dms, search_messages,",
       "list_channels, lookup_user, add_reaction, set_topic.",
-      "All requests go directly to the Slack API using the configured bot token.",
+      "Note: The bot must be invited to a channel (/invite @bot) before it can read history.",
+      "list_dms lists DM conversations. search_messages requires a user token (xoxp-);",
+      "if unavailable, use list_channels + channel_history as an alternative.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
     execute: async (_toolCallId, args) => {
@@ -101,6 +104,28 @@ export function createSlackIntegrationTool(options?: {
           return {
             content: [{ type: "text", text }],
             details: { channel, threadTs, count: messages.length, messages },
+          };
+        }
+
+        case "list_dms": {
+          const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
+          const dms = await client.listDMs(Math.max(1, Math.min(100, limit)));
+          if (dms.length === 0) {
+            return {
+              content: [{ type: "text", text: "No DM conversations found." }],
+              details: { count: 0 },
+            };
+          }
+          const lines: string[] = [];
+          for (const dm of dms) {
+            const preview = dm.latest ? `: ${dm.latest.text?.slice(0, 120) ?? "(empty)"}` : "";
+            lines.push(`${dm.id} (user: ${dm.user})${preview}`);
+          }
+          return {
+            content: [
+              { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}` },
+            ],
+            details: { count: dms.length, dms },
           };
         }
 

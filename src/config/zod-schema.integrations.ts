@@ -34,6 +34,8 @@ export const SlackIntegrationSchema = z
   .object({
     enabled: z.boolean().optional(),
     botToken: z.string().optional(),
+    /** User OAuth token (xoxp-...) for APIs that require user-level auth (e.g. search.messages). */
+    userToken: z.string().optional(),
     appToken: z.string().optional(),
     signingSecret: z.string().optional(),
     defaultChannel: z.string().optional(),
