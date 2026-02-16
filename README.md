@@ -147,7 +147,7 @@ Alternatively, edit your config file directly at `~/.localclaw/openclaw.local.js
 
 ### Jira Integration
 
-Connect your Jira Cloud or Jira Server instance to let the agent manage issues, track projects, and automate workflows.
+Connect your Jira Cloud or Jira Server/Data Center instance to let the agent manage issues, track projects, and automate workflows.
 
 #### Capabilities
 
@@ -162,11 +162,13 @@ Connect your Jira Cloud or Jira Server instance to let the agent manage issues, 
 
 #### Prerequisites
 
-1. A Jira Cloud or Jira Server instance
-2. An Atlassian account email address
-3. A Jira API token — generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+1. A Jira Cloud or Jira Server/Data Center instance
+2. **For Jira Cloud:** An Atlassian account email and API token — generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+3. **For Jira Server/Data Center:** A Personal Access Token (PAT) — generate one in your Jira profile settings under **Personal Access Tokens**
 
 #### Configuration
+
+**Jira Cloud** (default — uses email + API token):
 
 ```json5
 {
@@ -183,6 +185,28 @@ Connect your Jira Cloud or Jira Server instance to let the agent manage issues, 
   },
 }
 ```
+
+**Jira Server/Data Center** (uses Personal Access Token with Bearer auth):
+
+```json5
+{
+  integrations: {
+    jira: {
+      enabled: true,
+      baseUrl: "https://jira.yourcompany.com",    // Your Jira Server URL
+      authType: "pat",                              // Use Personal Access Token auth
+      apiToken: "MDM2OTk1...",                     // Personal Access Token
+      apiVersion: "2",                              // REST API v2 (default for PAT)
+      defaultProject: "PROJ",
+    },
+  },
+}
+```
+
+| Config Key | Description |
+|------------|-------------|
+| `authType` | `"basic"` (default, Cloud) or `"pat"` (Personal Access Token, Server/DC) |
+| `apiVersion` | `"3"` (default for Cloud) or `"2"` (default for PAT/Server) |
 
 #### Example Agent Interactions
 
@@ -244,7 +268,7 @@ Connect your Confluence Cloud or Server instance to let the agent search, read, 
 
 ### Slack Integration
 
-Connect Slack to let the agent post messages, read channel history, search conversations, and interact with your team's workspace as a tool.
+Connect Slack to let the agent read and send DMs, post to channels, search conversations, and interact with your team's workspace. Messages sent via the user token appear **as you** — not as a bot.
 
 > **Note:** This is the Slack *integration* (agent tool for reading/writing Slack). It is separate from the Slack *channel* (which routes incoming Slack messages to the agent). You can use both simultaneously.
 
@@ -252,10 +276,14 @@ Connect Slack to let the agent post messages, read channel history, search conve
 
 | Action | Description |
 |--------|-------------|
+| **Read DMs** | Find any person by username and read your DM conversation with them |
+| **Send DMs** | Send a direct message to any user by username — appears as you |
 | **Post messages** | Send messages to any channel or thread, with link unfurling control |
-| **Channel history** | Read recent messages from any channel the bot is a member of |
+| **Channel history** | Read recent messages from any channel (up to 200 messages) |
+| **List DMs** | Browse your 50 most recent DM conversations with user names |
 | **Thread replies** | Fetch all replies in a specific thread |
-| **Search messages** | Full-text search across the workspace, sorted by relevance or timestamp |
+| **Search messages** | Full-text search across the workspace (auto-detects usernames and includes DM history) |
+| **Find users** | Search for users by name, username, or email |
 | **List channels** | Enumerate public and private channels with topic, purpose, and membership |
 | **User lookup** | Resolve user IDs to names, real names, emails, and bot status |
 | **Add reactions** | React to messages with emoji |
@@ -265,53 +293,92 @@ Connect Slack to let the agent post messages, read channel history, search conve
 
 1. A Slack workspace where you can install apps
 2. A **Slack App** with a Bot User — create one at [https://api.slack.com/apps](https://api.slack.com/apps)
-3. A **Bot User OAuth Token** (`xoxb-...`) — required for all operations
+3. A **Bot User OAuth Token** (`xoxb-...`) — required for channel operations
+4. A **User OAuth Token** (`xoxp-...`) — required for DMs, search, and sending messages as yourself
 
-**Required bot token scopes** (add these in your Slack App's OAuth & Permissions page):
+#### Creating a Slack App (Step by Step)
+
+1. Go to [https://api.slack.com/apps](https://api.slack.com/apps) and click **Create New App**
+2. Choose **From scratch**, give it a name (e.g. "LocalClaw"), and select your workspace
+3. Go to **OAuth & Permissions** in the left sidebar
+4. Under **Scopes**, add the bot token scopes and user token scopes listed below
+5. Click **Install to Workspace** at the top of the OAuth page and authorize
+6. Copy the **Bot User OAuth Token** (`xoxb-...`) and **User OAuth Token** (`xoxp-...`)
+7. Add both tokens to your LocalClaw config (see [Configuration](#slack-configuration) below)
+
+#### Required Scopes
+
+**Bot Token Scopes** (under "Bot Token Scopes" in OAuth & Permissions):
 
 | Scope | Used for |
 |-------|----------|
-| `chat:write` | Posting messages |
+| `chat:write` | Posting messages to channels |
 | `channels:history` | Reading public channel history |
 | `channels:read` | Listing public channels |
 | `groups:history` | Reading private channel history |
 | `groups:read` | Listing private channels |
-| `search:read` | Searching messages |
+| `im:history` | Reading DM history |
+| `im:read` | Listing DM conversations |
+| `im:write` | Opening DM conversations |
 | `users:read` | Looking up user info |
 | `users:read.email` | Reading user email addresses |
 | `reactions:write` | Adding emoji reactions |
 | `channels:manage` | Setting channel topics |
 
-**Optional tokens:**
+**User Token Scopes** (under "User Token Scopes" in OAuth & Permissions):
 
-- **App-Level Token** (`xapp-...`) — needed only if you use Slack Socket Mode
-- **Signing Secret** — needed only if you receive webhook events from Slack
+| Scope | Used for |
+|-------|----------|
+| `chat:write` | Sending DMs as yourself (not as the bot) |
+| `im:history` | Reading your DM conversations |
+| `im:read` | Listing your DMs |
+| `im:write` | Opening DM conversations |
+| `search:read` | Searching messages across the workspace |
+| `users:read` | Looking up user info for DM resolution |
 
-#### Configuration
+> **Why two tokens?** The bot token (`xoxb-`) operates as the app bot and can only see channels it's invited to. The user token (`xoxp-`) operates as *you* — it can read your DMs, search your messages, and send DMs that appear from you (not the bot). For the best experience, configure both.
+
+#### Slack Configuration
 
 ```json5
 {
   integrations: {
     slack: {
       enabled: true,
-      botToken: "xoxb-1234-5678-abcdef",    // Bot User OAuth Token (required)
-      appToken: "xapp-1-A0B1C2-...",         // Optional: App-Level Token for Socket Mode
-      signingSecret: "a1b2c3d4e5f6...",      // Optional: for webhook verification
-      defaultChannel: "#general",             // Optional: default channel for posting
-      timeoutSeconds: 30,                     // Optional: API request timeout (default: 30)
+      botToken: "xoxb-1234-5678-abcdef",     // Bot User OAuth Token (required)
+      userToken: "xoxp-1234-5678-ghijkl",     // User OAuth Token (required for DMs + search)
+      appToken: "xapp-1-A0B1C2-...",          // Optional: App-Level Token for Socket Mode
+      signingSecret: "a1b2c3d4e5f6...",       // Optional: for webhook verification
+      defaultChannel: "#general",              // Optional: default channel for posting
+      timeoutSeconds: 30,                      // Optional: API request timeout (default: 30)
     },
   },
 }
 ```
 
+| Config Key | Required | Description |
+|------------|----------|-------------|
+| `botToken` | Yes | Bot User OAuth Token (`xoxb-...`) for channel operations |
+| `userToken` | Recommended | User OAuth Token (`xoxp-...`) for DMs, search, and posting as yourself |
+| `defaultChannel` | No | Default channel for `post_message` when no channel specified |
+| `timeoutSeconds` | No | API request timeout in seconds (default: 30) |
+
 #### Example Agent Interactions
 
-- *"Post a message to #engineering: Deployment complete for v2.1.0"* — agent posts the message and confirms delivery
+- *"Pull my last 10 DMs with ryan.valencia"* — agent finds the user, opens the DM, and displays the conversation
+- *"Send a DM to john.smith saying 'Meeting moved to 3pm'"* — agent sends the DM as you
+- *"Post a message to #engineering: Deployment complete for v2.1.0"* — agent posts to the channel
 - *"What's been discussed in #product today?"* — agent fetches recent channel history and summarizes
 - *"Search Slack for messages about the database migration"* — agent searches across channels and returns matching messages
 - *"Who is user U01234ABCDE?"* — agent looks up the user and returns their name and email
-- *"Reply to the thread in #ops about the outage with an update"* — agent posts a threaded reply
 - *"React to the last message in #general with :thumbsup:"* — agent adds the emoji reaction
+
+#### Troubleshooting
+
+- **"channel_not_found" on DM operations** — Make sure you have a `userToken` configured. Bot tokens can't access user DMs.
+- **"missing_scope" errors** — Check that your Slack App has all the required scopes listed above, then reinstall the app to your workspace.
+- **Search returns no results** — The `search:read` scope must be on the *User Token Scopes*, not the Bot Token Scopes. Slack's `search.messages` API only works with user tokens.
+- **DMs appear from the bot instead of you** — Ensure `userToken` is set. When present, DM operations automatically use the user token so messages appear from your account.
 
 ---
 
@@ -340,6 +407,7 @@ All three integrations can be configured in a single `integrations` block in you
     slack: {
       enabled: true,
       botToken: "xoxb-...",
+      userToken: "xoxp-...",              // Recommended: enables DMs + search
       defaultChannel: "#general",
     },
   },
