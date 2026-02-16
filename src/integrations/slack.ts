@@ -228,7 +228,6 @@ export class SlackClient {
     total: number;
   }> {
     // search.messages requires a user token (xoxp-), not a bot token (xoxb-).
-    const token = this.userToken ?? this.botToken;
     if (!this.userToken) {
       throw new Error(
         "Slack search requires a User OAuth Token (xoxp-...). " +
@@ -236,7 +235,23 @@ export class SlackClient {
           "Add a 'userToken' to your Slack integration config, or use 'list_channels' + 'channel_history' instead.",
       );
     }
-    const result = await this.request<{
+    // search.messages does NOT accept JSON POST — use GET with query params.
+    const qs = new URLSearchParams({
+      query: params.query,
+      count: String(params.count ?? 20),
+      sort: params.sort ?? "score",
+    });
+    const url = `https://slack.com/api/search.messages?${qs}`;
+    const response = await fetch(url, {
+      headers: this.headersFor(this.userToken),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Slack HTTP error ${response.status}`);
+    }
+    const result = (await response.json()) as {
+      ok: boolean;
+      error?: string;
       messages: {
         total: number;
         matches: Array<{
@@ -246,15 +261,10 @@ export class SlackClient {
           channel: { id: string; name: string };
         }>;
       };
-    }>(
-      "search.messages",
-      {
-        query: params.query,
-        count: params.count ?? 20,
-        sort: params.sort ?? "score",
-      },
-      { token },
-    );
+    };
+    if (!result.ok) {
+      throw new Error(`Slack API error: ${result.error ?? "unknown"}`);
+    }
 
     return {
       messages: result.messages.matches.map((m) => ({
