@@ -209,6 +209,24 @@ export class SlackClient {
     }));
   }
 
+  private userNameCache: Map<string, string> = new Map();
+
+  async resolveUserNames(userIds: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(userIds.filter(Boolean))];
+    const missing = unique.filter((id) => !this.userNameCache.has(id));
+    await Promise.all(
+      missing.map(async (id) => {
+        try {
+          const user = await this.lookupUser(id);
+          this.userNameCache.set(id, user.realName ?? user.name);
+        } catch {
+          this.userNameCache.set(id, id);
+        }
+      }),
+    );
+    return this.userNameCache;
+  }
+
   private channelNameCache: Map<string, string> | null = null;
 
   async resolveChannelId(channelOrName: string): Promise<string> {

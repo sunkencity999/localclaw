@@ -138,9 +138,16 @@ async function executeSlackAction(
       const channel = await client.resolveChannelId(rawCh);
       const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
       const messages = await client.getChannelHistory(channel, Math.max(1, Math.min(200, limit)));
+      const userIds = messages.map((m) => m.user).filter((u): u is string => !!u);
+      const names = await client.resolveUserNames(userIds);
       const text =
         messages.length > 0
-          ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+          ? messages
+              .map((m) => {
+                const name = m.user ? (names.get(m.user) ?? m.user) : "unknown";
+                return `[${m.ts}] ${name} (${m.user ?? "?"}): ${m.text}`;
+              })
+              .join("\n")
           : "No messages found.";
       return {
         content: [{ type: "text", text }],
@@ -153,9 +160,16 @@ async function executeSlackAction(
       const channel = await client.resolveChannelId(rawThCh);
       const threadTs = readStringParam(params, "threadTs", { required: true });
       const messages = await client.getThreadReplies(channel, threadTs);
+      const userIds = messages.map((m) => m.user).filter((u): u is string => !!u);
+      const names = await client.resolveUserNames(userIds);
       const text =
         messages.length > 0
-          ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+          ? messages
+              .map((m) => {
+                const name = m.user ? (names.get(m.user) ?? m.user) : "unknown";
+                return `[${m.ts}] ${name} (${m.user ?? "?"}): ${m.text}`;
+              })
+              .join("\n")
           : "No replies found.";
       return {
         content: [{ type: "text", text }],
