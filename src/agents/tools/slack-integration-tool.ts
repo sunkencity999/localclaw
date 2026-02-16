@@ -9,6 +9,8 @@ const SLACK_INTEGRATION_ACTIONS = [
   "channel_history",
   "thread_replies",
   "list_dms",
+  "find_user",
+  "open_dm",
   "search_messages",
   "list_channels",
   "lookup_user",
@@ -46,11 +48,13 @@ export function createSlackIntegrationTool(options?: {
     name: "slack_integration",
     description: [
       "Slack integration for posting messages, reading channels, DMs, and searching.",
-      "Actions: post_message, channel_history, thread_replies, list_dms, search_messages,",
-      "list_channels, lookup_user, add_reaction, set_topic.",
-      "Note: The bot must be invited to a channel (/invite @bot) before it can read history.",
-      "list_dms lists DM conversations. search_messages requires a user token (xoxp-);",
-      "if unavailable, use list_channels + channel_history as an alternative.",
+      "Actions: post_message, channel_history, thread_replies, list_dms, find_user, open_dm,",
+      "search_messages, list_channels, lookup_user, add_reaction, set_topic.",
+      "To read a specific person's DMs: 1) find_user with their name to get their user ID,",
+      "2) open_dm with that user ID to get the DM channel ID,",
+      "3) channel_history with that channel ID to read messages.",
+      "list_dms shows recent DM conversations with resolved names.",
+      "The bot must be invited to a channel (/invite @bot) before it can read channel history.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
     execute: async (_toolCallId, args) => {
@@ -109,7 +113,7 @@ export function createSlackIntegrationTool(options?: {
 
         case "list_dms": {
           const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
-          const dms = await client.listDMs(Math.max(1, Math.min(100, limit)));
+          const dms = await client.listDMs(Math.max(1, Math.min(50, limit)));
           if (dms.length === 0) {
             return {
               content: [{ type: "text", text: "No DM conversations found." }],
@@ -118,14 +122,51 @@ export function createSlackIntegrationTool(options?: {
           }
           const lines: string[] = [];
           for (const dm of dms) {
-            const preview = dm.latest ? `: ${dm.latest.text?.slice(0, 120) ?? "(empty)"}` : "";
-            lines.push(`${dm.id} (user: ${dm.user})${preview}`);
+            const name = dm.realName ?? dm.userName ?? dm.user;
+            const preview = dm.latest?.text ? ` | ${dm.latest.text.slice(0, 100)}` : "";
+            lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
           }
           return {
             content: [
               { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}` },
             ],
             details: { count: dms.length, dms },
+          };
+        }
+
+        case "find_user": {
+          const query = readStringParam(params, "query", { required: true });
+          const limit = readNumberParam(params, "limit", { integer: true }) ?? 10;
+          const users = await client.findUsers(query, Math.max(1, Math.min(25, limit)));
+          if (users.length === 0) {
+            return {
+              content: [{ type: "text", text: `No users found matching "${query}".` }],
+              details: { count: 0 },
+            };
+          }
+          const text = users
+            .map(
+              (u) =>
+                `${u.id} — ${u.realName ?? u.name} (${u.name})${u.email ? ` <${u.email}>` : ""}`,
+            )
+            .join("\n");
+          return {
+            content: [{ type: "text", text: `${users.length} user(s) found:\n${text}` }],
+            details: { count: users.length, users },
+          };
+        }
+
+        case "open_dm": {
+          const userId = readStringParam(params, "userId", { required: true });
+          const result = await client.openDM(userId);
+          return {
+            content: [
+              {
+                type: "text",
+                text: `DM channel opened: ${result.channelId} (use channel_history to read messages)`,
+              },
+            ],
+            details: result,
           };
         }
 

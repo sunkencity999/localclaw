@@ -211,9 +211,15 @@ export class SlackClient {
     };
   }
 
-  async listDMs(
-    limit = 20,
-  ): Promise<Array<{ id: string; user: string; latest?: SlackMessage | null }>> {
+  async listDMs(limit = 20): Promise<
+    Array<{
+      id: string;
+      user: string;
+      userName?: string | null;
+      realName?: string | null;
+      latest?: SlackMessage | null;
+    }>
+  > {
     // Use userToken to list the user's DMs (bot token only sees its own DMs).
     const token = this.userToken ?? this.botToken;
     const result = await this.request<{
@@ -224,19 +230,101 @@ export class SlackClient {
       }>;
     }>("conversations.list", { types: "im", limit, exclude_archived: true }, { token });
 
-    return result.channels.map((dm) => ({
-      id: dm.id,
-      user: dm.user,
-      latest: dm.latest
-        ? {
-            ts: dm.latest.ts,
-            channel: dm.id,
-            text: dm.latest.text,
-            user: dm.latest.user ?? null,
-            threadTs: dm.latest.thread_ts ?? null,
-          }
-        : null,
-    }));
+    // Batch-resolve user IDs to names so the model can identify conversations.
+    const userIds = result.channels.map((dm) => dm.user).filter(Boolean);
+    const nameMap = new Map<string, { name: string; realName: string | null }>();
+    const batchSize = 10;
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      const batch = userIds.slice(i, i + batchSize);
+      const lookups = await Promise.allSettled(
+        batch.map((uid) =>
+          this.request<{
+            user: { id: string; name: string; real_name?: string };
+          }>("users.info", { user: uid }).then((r) => ({
+            id: uid,
+            name: r.user.name,
+            realName: r.user.real_name ?? null,
+          })),
+        ),
+      );
+      for (const r of lookups) {
+        if (r.status === "fulfilled") {
+          nameMap.set(r.value.id, { name: r.value.name, realName: r.value.realName });
+        }
+      }
+    }
+
+    return result.channels.map((dm) => {
+      const info = nameMap.get(dm.user);
+      return {
+        id: dm.id,
+        user: dm.user,
+        userName: info?.name ?? null,
+        realName: info?.realName ?? null,
+        latest: dm.latest
+          ? {
+              ts: dm.latest.ts,
+              channel: dm.id,
+              text: dm.latest.text,
+              user: dm.latest.user ?? null,
+              threadTs: dm.latest.thread_ts ?? null,
+            }
+          : null,
+      };
+    });
+  }
+
+  /** Search for users by name, username, or email. Paginates through the full workspace roster. */
+  async findUsers(query: string, limit = 10): Promise<SlackUser[]> {
+    const q = query.toLowerCase();
+    const matches: SlackUser[] = [];
+    let cursor: string | undefined;
+    // Paginate through users.list to find matches (Slack has no server-side name search).
+    for (let page = 0; page < 20 && matches.length < limit; page++) {
+      const params: Record<string, unknown> = { limit: 200 };
+      if (cursor) params.cursor = cursor;
+      const result = await this.request<{
+        members: Array<{
+          id: string;
+          name: string;
+          real_name?: string;
+          profile?: { email?: string; display_name?: string };
+          is_bot: boolean;
+          deleted: boolean;
+        }>;
+        response_metadata?: { next_cursor?: string };
+      }>("users.list", params);
+
+      for (const u of result.members) {
+        if (u.deleted) continue;
+        const fields = [u.name, u.real_name, u.profile?.email, u.profile?.display_name]
+          .filter(Boolean)
+          .map((s) => s!.toLowerCase());
+        if (fields.some((f) => f.includes(q))) {
+          matches.push({
+            id: u.id,
+            name: u.name,
+            realName: u.real_name ?? null,
+            email: u.profile?.email ?? null,
+            isBot: u.is_bot,
+          });
+          if (matches.length >= limit) break;
+        }
+      }
+
+      cursor = result.response_metadata?.next_cursor || undefined;
+      if (!cursor) break;
+    }
+    return matches;
+  }
+
+  /** Open (or find) a DM channel with a specific user. */
+  async openDM(userId: string): Promise<{ channelId: string }> {
+    const token = this.userToken ?? this.botToken;
+    const result = await this.request<{
+      channel: { id: string };
+    }>("conversations.open", { users: userId }, { token });
+    return { channelId: result.channel.id };
   }
 
   async searchMessages(params: SlackSearchParams): Promise<{
