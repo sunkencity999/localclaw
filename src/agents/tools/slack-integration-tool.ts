@@ -268,6 +268,32 @@ async function executeSlackAction(
     case "search_messages": {
       const query = readStringParam(params, "query", { required: true });
       const limit = readNumberParam(params, "limit", { integer: true });
+
+      // Auto-detect username queries and include DM conversation.
+      // If the query looks like a username (e.g. "ryan.valencia"), try to
+      // find the user, open their DM, and return conversation history.
+      let dmSection = "";
+      const looksLikeUsername = /^[\w.-]+$/.test(query.trim()) && query.includes(".");
+      if (looksLikeUsername) {
+        try {
+          const users = await client.findUsers(query.trim(), 1);
+          if (users.length > 0) {
+            const user = users[0];
+            const dm = await client.openDM(user.id);
+            const msgLimit = limit ? Math.max(1, Math.min(50, limit)) : 10;
+            const msgs = await client.getChannelHistory(dm.channelId, msgLimit);
+            const header = `DM with ${user.realName ?? user.name} (@${user.name}), channel ${dm.channelId}`;
+            const body =
+              msgs.length > 0
+                ? msgs.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+                : "No messages.";
+            dmSection = `${header}\n${msgs.length} message(s):\n${body}\n\n---\n`;
+          }
+        } catch {
+          // Ignore; fall through to regular search.
+        }
+      }
+
       const result = await client.searchMessages({
         query,
         count: limit ? Math.max(1, Math.min(100, limit)) : undefined,
@@ -279,7 +305,7 @@ async function executeSlackAction(
               .join("\n")
           : "No messages found.";
       return {
-        content: [{ type: "text", text: `${result.total} result(s)\n${text}` }],
+        content: [{ type: "text", text: `${dmSection}${result.total} search result(s)\n${text}` }],
         details: result,
       };
     }
