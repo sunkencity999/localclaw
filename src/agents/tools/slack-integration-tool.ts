@@ -53,8 +53,10 @@ export function createSlackIntegrationTool(options?: {
       "Slack workspace integration.",
       "To find/read DMs with a SPECIFIC PERSON: use action=list_dms with query=their_username",
       "(e.g. query='ryan.valencia'). This searches the entire workspace and returns their DM",
-      "messages directly — even if the DM is old. Without query, list_dms shows the 50 most",
-      "recent DMs (limit up to 200). read_dm also works for this (same result).",
+      "messages directly — even if the DM is old. read_dm also works for this (same result).",
+      "To CHECK ALL RECENT DMs: use action=list_dms (no query). This returns your recent DMs",
+      "with the last message preview, WHO sent it, and WHEN. The output already tells you which",
+      "DMs need a response — DO NOT call channel_history on each DM individually.",
       "To SEND a DM: use action=post_dm with query=their_username and text=your_message.",
       "post_message can also post to DMs if you have the DM channel ID (from list_dms/read_dm).",
       "Other: channel_history, thread_replies, search_messages, list_channels,",
@@ -203,7 +205,7 @@ async function executeSlackAction(
 
     case "list_dms": {
       const query = readStringParam(params, "query");
-      const limit = readNumberParam(params, "limit", { integer: true }) ?? (query ? 10 : 50);
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? (query ? 10 : 20);
 
       // If query is provided, use fast search to find that specific person's DM.
       if (query) {
@@ -250,18 +252,38 @@ async function executeSlackAction(
         };
       }
       const lines: string[] = [];
+      let needsReplyCount = 0;
       for (const dm of dms) {
         const name = dm.realName ?? dm.userName ?? dm.user;
-        const preview = dm.latest?.text ? ` | ${dm.latest.text.slice(0, 100)}` : "";
-        lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
+        const latestMsg = dm.latest;
+        let preview = "";
+        let needsReply = false;
+        if (latestMsg?.text) {
+          // Determine if the other person sent the last message (needs your reply).
+          const senderIsOther = latestMsg.user === dm.user;
+          const sender = senderIsOther ? name : "You";
+          needsReply = senderIsOther;
+          if (needsReply) needsReplyCount++;
+          // Convert Slack timestamp to human-readable.
+          const epochSec = Number(latestMsg.ts.split(".")[0]);
+          const timeStr = new Date(epochSec * 1000).toLocaleString();
+          const tag = needsReply ? " [NEEDS REPLY]" : "";
+          preview = ` | ${timeStr} | ${sender}: ${latestMsg.text.slice(0, 120)}${tag}`;
+        }
+        lines.push(`${dm.id} — ${name} (@${dm.userName ?? dm.user})${preview}`);
       }
-      const hint =
-        "\nTip: To find a specific person's DMs, use list_dms with query=their_username.";
+      const summary =
+        needsReplyCount > 0
+          ? `${needsReplyCount} conversation(s) marked [NEEDS REPLY] (the other person sent the last message).`
+          : "All conversations are up to date (you sent the last message in each).";
       return {
         content: [
-          { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}${hint}` },
+          {
+            type: "text",
+            text: `${dms.length} DM conversation(s):\n${lines.join("\n")}\n\n${summary}`,
+          },
         ],
-        details: { count: dms.length, dms },
+        details: { count: dms.length, needsReplyCount, dms },
       };
     }
 

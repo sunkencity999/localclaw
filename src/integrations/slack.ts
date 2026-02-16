@@ -228,52 +228,91 @@ export class SlackClient {
   > {
     // Use userToken to list the user's DMs (bot token only sees its own DMs).
     const token = this.userToken ?? this.botToken;
+    // Fetch more channels than requested so we can sort by activity and return the top N.
+    const fetchLimit = Math.min(limit * 2, 200);
     const result = await this.request<{
       channels: Array<{
         id: string;
         user: string;
-        latest?: { ts: string; text: string; user?: string; thread_ts?: string } | null;
       }>;
-    }>("conversations.list", { types: "im", limit, exclude_archived: true }, { token });
+    }>("conversations.list", { types: "im", limit: fetchLimit, exclude_archived: true }, { token });
 
-    // Resolve all user IDs to names in parallel (single batch).
-    const userIds = result.channels.map((dm) => dm.user).filter(Boolean);
+    const channels = result.channels;
+    if (channels.length === 0) return [];
+
+    // In parallel: resolve user names AND fetch latest message for each DM.
+    // conversations.list doesn't return 'latest' for IM channels, so we
+    // fetch it via conversations.history with limit=1.
+    const userIds = channels.map((dm) => dm.user).filter(Boolean);
     const nameMap = new Map<string, { name: string; realName: string | null }>();
-    const lookups = await Promise.allSettled(
-      userIds.map((uid) =>
+    const latestMap = new Map<string, SlackMessage | null>();
+
+    const allWork = await Promise.allSettled([
+      // Batch 1: user info lookups.
+      ...userIds.map((uid) =>
         this.request<{
           user: { id: string; name: string; real_name?: string };
         }>("users.info", { user: uid }).then((r) => ({
+          _type: "user" as const,
           id: uid,
           name: r.user.name,
           realName: r.user.real_name ?? null,
         })),
       ),
-    );
-    for (const r of lookups) {
-      if (r.status === "fulfilled") {
-        nameMap.set(r.value.id, { name: r.value.name, realName: r.value.realName });
+      // Batch 2: latest message for each DM.
+      ...channels.map((dm) =>
+        this.request<{
+          messages: Array<{ ts: string; text: string; user?: string; thread_ts?: string }>;
+        }>("conversations.history", { channel: dm.id, limit: 1 }, { token }).then((r) => ({
+          _type: "history" as const,
+          channelId: dm.id,
+          message: r.messages?.[0] ?? null,
+        })),
+      ),
+    ]);
+
+    for (const r of allWork) {
+      if (r.status !== "fulfilled") continue;
+      const val = r.value;
+      if (val._type === "user") {
+        nameMap.set(val.id, { name: val.name, realName: val.realName });
+      } else if (val._type === "history") {
+        const msg = val.message;
+        latestMap.set(
+          val.channelId,
+          msg
+            ? {
+                ts: msg.ts,
+                channel: val.channelId,
+                text: msg.text,
+                user: msg.user ?? null,
+                threadTs: msg.thread_ts ?? null,
+              }
+            : null,
+        );
       }
     }
 
-    return result.channels.map((dm) => {
+    // Build results and sort by most recent message first.
+    const results = channels.map((dm) => {
       const info = nameMap.get(dm.user);
       return {
         id: dm.id,
         user: dm.user,
         userName: info?.name ?? null,
         realName: info?.realName ?? null,
-        latest: dm.latest
-          ? {
-              ts: dm.latest.ts,
-              channel: dm.id,
-              text: dm.latest.text,
-              user: dm.latest.user ?? null,
-              threadTs: dm.latest.thread_ts ?? null,
-            }
-          : null,
+        latest: latestMap.get(dm.id) ?? null,
       };
     });
+
+    // Sort: DMs with messages first (newest message first), then empty DMs last.
+    results.sort((a, b) => {
+      const tsA = a.latest ? Number(a.latest.ts) : 0;
+      const tsB = b.latest ? Number(b.latest.ts) : 0;
+      return tsB - tsA;
+    });
+
+    return results.slice(0, limit);
   }
 
   /**
