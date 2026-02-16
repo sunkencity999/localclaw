@@ -6,8 +6,16 @@
  */
 
 import type { OpenClawConfig } from "../../config/config.js";
-import type { AgentRoutingConfig } from "../../config/types.agent-defaults.js";
-import { parseModelRef } from "../../agents/model-selection.js";
+import type {
+  AgentOrchestratorConfig,
+  AgentRoutingConfig,
+} from "../../config/types.agent-defaults.js";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
+import {
+  modelKey,
+  parseModelRef,
+  resolveConfiguredModelRef,
+} from "../../agents/model-selection.js";
 
 export type RoutingDecision = {
   /** Whether the message was routed to the fast model. */
@@ -212,4 +220,180 @@ export function resolveSmartRoute(params: {
     complexity,
     reason,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Orchestrator routing — route complex tasks UP to a powerful API model,
+// keep simple/routine work on the local model.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the orchestrator config from agent defaults.
+ */
+export function resolveOrchestratorConfig(cfg: OpenClawConfig): AgentOrchestratorConfig | null {
+  const orchestrator = cfg.agents?.defaults?.orchestrator;
+  if (!orchestrator || orchestrator.enabled !== true || !orchestrator.model) {
+    return null;
+  }
+  return orchestrator;
+}
+
+export type OrchestratorRoutingDecision = RoutingDecision & {
+  /** When true, the local model should be added as a fallback for this run. */
+  localFallback?: { provider: string; model: string };
+  /** When "fallback-only", the orchestrator model should be a fallback for the local run. */
+  orchestratorFallback?: { provider: string; model: string };
+};
+
+/**
+ * Determine whether to route a message to the orchestrator (powerful API) model.
+ *
+ * - "auto": complex messages → orchestrator, simple → local (default)
+ * - "always": always use orchestrator, local is fallback
+ * - "fallback-only": use local, orchestrator is fallback when local fails
+ */
+export function resolveOrchestratorRoute(params: {
+  message: string;
+  cfg: OpenClawConfig;
+  currentProvider: string;
+  currentModel: string;
+  defaultProvider: string;
+}): OrchestratorRoutingDecision {
+  const noRoute: OrchestratorRoutingDecision = {
+    routed: false,
+    provider: params.currentProvider,
+    model: params.currentModel,
+    complexity: "complex",
+    reason: "orchestrator disabled or no model configured",
+  };
+
+  const orchestrator = resolveOrchestratorConfig(params.cfg);
+  if (!orchestrator?.model) {
+    return noRoute;
+  }
+
+  const ref = parseModelRef(orchestrator.model, params.defaultProvider);
+  if (!ref) {
+    return { ...noRoute, reason: `invalid orchestrator model ref: ${orchestrator.model}` };
+  }
+
+  const strategy = orchestrator.strategy ?? "auto";
+  const localModel = { provider: params.currentProvider, model: params.currentModel };
+
+  // "always" — always use orchestrator, local is fallback
+  if (strategy === "always") {
+    return {
+      routed: true,
+      provider: ref.provider,
+      model: ref.model,
+      complexity: "complex",
+      reason: "orchestrator strategy: always",
+      localFallback: localModel,
+    };
+  }
+
+  // "fallback-only" — use local by default, orchestrator is fallback when local fails
+  if (strategy === "fallback-only") {
+    return {
+      routed: false,
+      provider: params.currentProvider,
+      model: params.currentModel,
+      complexity: "complex",
+      reason: "orchestrator strategy: fallback-only (orchestrator available as fallback)",
+      orchestratorFallback: { provider: ref.provider, model: ref.model },
+    };
+  }
+
+  // "auto" — classify and route complex tasks to orchestrator
+  const maxLen = orchestrator.maxSimpleLength ?? DEFAULT_MAX_SIMPLE_LENGTH;
+  const trimmed = params.message.trim();
+
+  // Long messages are complex
+  if (trimmed.length > maxLen) {
+    return {
+      routed: true,
+      provider: ref.provider,
+      model: ref.model,
+      complexity: "complex",
+      reason: `message too long for local (${trimmed.length} > ${maxLen} chars)`,
+      localFallback: localModel,
+    };
+  }
+
+  const { complexity, reason } = classifyMessageComplexity(trimmed);
+
+  if (complexity === "complex") {
+    return {
+      routed: true,
+      provider: ref.provider,
+      model: ref.model,
+      complexity,
+      reason: `orchestrator: ${reason}`,
+      localFallback: localModel,
+    };
+  }
+
+  // Simple message → stay on local
+  return {
+    routed: false,
+    provider: params.currentProvider,
+    model: params.currentModel,
+    complexity,
+    reason,
+  };
+}
+
+/**
+ * Resolve fallback overrides for a run, injecting orchestrator ↔ local fallbacks.
+ *
+ * - If the run is using the orchestrator API model → inject the local primary as fallback.
+ * - If strategy is "fallback-only" and using local → inject orchestrator as fallback.
+ * - Otherwise, return the existing per-agent fallbacks unchanged.
+ */
+export function resolveOrchestratorFallbacksForRun(params: {
+  cfg: OpenClawConfig;
+  runProvider: string;
+  runModel: string;
+  agentFallbacks?: string[];
+}): string[] | undefined {
+  const orchestrator = resolveOrchestratorConfig(params.cfg);
+  if (!orchestrator?.model) {
+    return params.agentFallbacks;
+  }
+
+  const orchRef = parseModelRef(orchestrator.model, DEFAULT_PROVIDER);
+  if (!orchRef) {
+    return params.agentFallbacks;
+  }
+
+  const orchKey = modelKey(orchRef.provider, orchRef.model);
+  const runKey = modelKey(params.runProvider, params.runModel);
+  const primary = resolveConfiguredModelRef({
+    cfg: params.cfg,
+    defaultProvider: DEFAULT_PROVIDER,
+    defaultModel: DEFAULT_MODEL,
+  });
+  const primaryKey = modelKey(primary.provider, primary.model);
+
+  const strategy = orchestrator.strategy ?? "auto";
+
+  // Running on orchestrator model → add local primary as fallback
+  if (runKey === orchKey) {
+    const existing = params.agentFallbacks ?? [];
+    if (existing.includes(primaryKey)) {
+      return existing;
+    }
+    return [primaryKey, ...existing];
+  }
+
+  // "fallback-only" and running on local → add orchestrator as fallback
+  if (strategy === "fallback-only" && runKey === primaryKey) {
+    const existing = params.agentFallbacks ?? [];
+    if (existing.includes(orchKey)) {
+      return existing;
+    }
+    return [...existing, orchKey];
+  }
+
+  return params.agentFallbacks;
 }

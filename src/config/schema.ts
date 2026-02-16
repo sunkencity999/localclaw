@@ -266,6 +266,10 @@ const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.model.fallbacks": "Model Fallbacks",
   "agents.defaults.imageModel.primary": "Image Model",
   "agents.defaults.imageModel.fallbacks": "Image Model Fallbacks",
+  "agents.defaults.orchestrator.enabled": "Orchestrator Enabled",
+  "agents.defaults.orchestrator.model": "Orchestrator Model",
+  "agents.defaults.orchestrator.strategy": "Orchestrator Strategy",
+  "agents.defaults.orchestrator.maxSimpleLength": "Orchestrator Max Simple Length",
   "agents.defaults.humanDelay.mode": "Human Delay Mode",
   "agents.defaults.humanDelay.minMs": "Human Delay Min (ms)",
   "agents.defaults.humanDelay.maxMs": "Human Delay Max (ms)",
@@ -603,6 +607,14 @@ const FIELD_HELP: Record<string, string> = {
   "agents.defaults.imageModel.primary":
     "Optional image model (provider/model) used when the primary model lacks image input.",
   "agents.defaults.imageModel.fallbacks": "Ordered fallback image models (provider/model).",
+  "agents.defaults.orchestrator.enabled":
+    "Enable orchestrator mode: route complex tasks to a powerful API model while keeping the local model for simple/routine work.",
+  "agents.defaults.orchestrator.model":
+    "Powerful API model for complex tasks (provider/model, e.g. 'anthropic/claude-sonnet-4').",
+  "agents.defaults.orchestrator.strategy":
+    'Routing strategy: "auto" (complex→API, simple→local), "always" (API first, local fallback), or "fallback-only" (local first, API when local fails).',
+  "agents.defaults.orchestrator.maxSimpleLength":
+    "Max message length (chars) for complexity classification in auto mode (default: 150).",
   "agents.defaults.cliBackends": "Optional CLI backends for text-only fallback (claude-cli, etc.).",
   "agents.defaults.humanDelay.mode": 'Delay style for block replies ("off", "natural", "custom").',
   "agents.defaults.humanDelay.minMs": "Minimum delay in ms for custom humanDelay (default: 800).",

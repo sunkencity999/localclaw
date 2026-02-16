@@ -18,6 +18,7 @@ export const CONFIGURE_WIZARD_SECTIONS = [
   "integrations",
   "hooks",
   "routing",
+  "orchestrator",
   "health",
 ] as const;
 
@@ -64,6 +65,11 @@ export const CONFIGURE_SECTION_OPTIONS: Array<{
     value: "routing",
     label: "Smart routing",
     hint: "Route simple queries to a fast/small model",
+  },
+  {
+    value: "orchestrator",
+    label: "Orchestrator",
+    hint: "Use a powerful API model for complex tasks, local for simple ones",
   },
   {
     value: "health",

@@ -216,6 +216,174 @@ async function promptRoutingConfig(
   };
 }
 
+async function promptOrchestratorConfig(
+  nextConfig: OpenClawConfig,
+  runtime: RuntimeEnv,
+  prompter: ReturnType<typeof createClackPrompter>,
+): Promise<OpenClawConfig> {
+  const orchestrator = nextConfig.agents?.defaults?.orchestrator;
+  const isEnabled = orchestrator?.enabled === true;
+  const currentModel = orchestrator?.model ?? "";
+  const currentStrategy = orchestrator?.strategy ?? "auto";
+  const currentMaxLen = orchestrator?.maxSimpleLength ?? 150;
+  const primaryModel =
+    typeof nextConfig.agents?.defaults?.model === "object"
+      ? nextConfig.agents?.defaults?.model?.primary
+      : nextConfig.agents?.defaults?.model;
+
+  note(
+    [
+      "The Orchestrator uses a powerful API model (e.g. Claude, GPT-4) for complex tasks",
+      "while keeping your local model for simple/routine work and offline fallback.",
+      "",
+      "Strategies:",
+      "  auto         — complex tasks → API, simple tasks → local (recommended)",
+      "  always       — always use API first, fall back to local on failure",
+      "  fallback-only — use local by default, API only when local fails",
+      "",
+      `Current: ${isEnabled ? `enabled (model: ${currentModel || "not set"}, strategy: ${currentStrategy})` : "disabled"}`,
+      primaryModel ? `Primary (local) model: ${primaryModel}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    "Orchestrator",
+  );
+
+  const enable = guardCancel(
+    await confirm({
+      message: "Enable orchestrator model?",
+      initialValue: isEnabled,
+    }),
+    runtime,
+  );
+
+  if (!enable) {
+    return {
+      ...nextConfig,
+      agents: {
+        ...nextConfig.agents,
+        defaults: {
+          ...nextConfig.agents?.defaults,
+          orchestrator: { enabled: false },
+        },
+      },
+    };
+  }
+
+  // Pick the orchestrator (API) model from catalog or manual entry
+  let orchModel = currentModel;
+  const catalog = await loadModelCatalog({ config: nextConfig, useCache: false });
+  const apiModels = catalog.filter(
+    (e) => !LOCAL_MODEL_PROVIDERS.includes(e.provider as (typeof LOCAL_MODEL_PROVIDERS)[number]),
+  );
+
+  if (apiModels.length > 0) {
+    const options = [
+      { value: "__manual__", label: "Enter manually" },
+      ...apiModels.slice(0, 30).map((m) => ({
+        value: `${m.provider}/${m.name}`,
+        label: `${m.provider}/${m.name}`,
+        hint: m.contextWindow ? `${Math.round(m.contextWindow / 1024)}K ctx` : undefined,
+      })),
+    ];
+    const selected = guardCancel(
+      await prompter.select({
+        message: "Orchestrator model (powerful API model for complex tasks)",
+        options,
+        initialValue: currentModel || options[1]?.value,
+      }),
+      runtime,
+    );
+    if (selected !== "__manual__") {
+      orchModel = selected;
+    }
+  }
+
+  if (!orchModel || orchModel === "__manual__") {
+    const input = guardCancel(
+      await text({
+        message: "Orchestrator model (provider/model, e.g. anthropic/claude-sonnet-4)",
+        initialValue: currentModel,
+        validate: (v) =>
+          String(v ?? "")
+            .trim()
+            .includes("/")
+            ? undefined
+            : "Use provider/model format",
+      }),
+      runtime,
+    );
+    orchModel = String(input ?? "").trim();
+  }
+
+  // Pick strategy
+  const strategy = guardCancel(
+    await select({
+      message: "Routing strategy",
+      options: [
+        {
+          value: "auto",
+          label: "Auto (recommended)",
+          hint: "Complex tasks → API, simple → local",
+        },
+        {
+          value: "always",
+          label: "Always API",
+          hint: "Always try API first, local is fallback",
+        },
+        {
+          value: "fallback-only",
+          label: "Fallback only",
+          hint: "Use local by default, API when local fails",
+        },
+      ],
+      initialValue: currentStrategy,
+    }),
+    runtime,
+  );
+
+  let maxSimpleLength = currentMaxLen;
+  if (strategy === "auto") {
+    const maxLenInput = guardCancel(
+      await text({
+        message: "Max message length (chars) to classify as simple",
+        initialValue: String(currentMaxLen),
+        validate: (v) =>
+          Number.isFinite(Number(v)) && Number(v) > 0 ? undefined : "Must be a positive number",
+      }),
+      runtime,
+    );
+    maxSimpleLength = Number.parseInt(String(maxLenInput), 10);
+  }
+
+  note(
+    [
+      `Orchestrator: enabled`,
+      `API model: ${orchModel}`,
+      `Local model: ${primaryModel ?? "(default)"}`,
+      `Strategy: ${strategy}`,
+      ...(strategy === "auto" ? [`Max simple length: ${maxSimpleLength} chars`] : []),
+    ].join("\n"),
+    "Orchestrator configured",
+  );
+
+  return {
+    ...nextConfig,
+    agents: {
+      ...nextConfig.agents,
+      defaults: {
+        ...nextConfig.agents?.defaults,
+        orchestrator: {
+          enabled: true,
+          model: orchModel,
+          strategy: strategy as "auto" | "always" | "fallback-only",
+          ...(strategy === "auto" ? { maxSimpleLength } : {}),
+        },
+      },
+    },
+  };
+}
+
 async function promptWebToolsConfig(
   nextConfig: OpenClawConfig,
   runtime: RuntimeEnv,
@@ -487,6 +655,10 @@ export async function runConfigureWizard(
 
       if (selected.includes("routing")) {
         nextConfig = await promptRoutingConfig(nextConfig, runtime, prompter);
+      }
+
+      if (selected.includes("orchestrator")) {
+        nextConfig = await promptOrchestratorConfig(nextConfig, runtime, prompter);
       }
 
       await persistConfig();

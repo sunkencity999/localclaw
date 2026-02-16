@@ -37,6 +37,7 @@ import { buildThreadingToolContext, resolveEnforceFinalTag } from "./agent-runne
 import { createBlockReplyPayloadKey, type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { parseReplyDirectives } from "./reply-directives.js";
 import { applyReplyTagsToPayload, isRenderablePayload } from "./reply-payloads.js";
+import { resolveOrchestratorFallbacksForRun } from "./smart-routing.js";
 
 export type AgentRunLoopResult =
   | {
@@ -143,15 +144,23 @@ export async function runAgentTurnWithFallback(params: {
       };
       const blockReplyPipeline = params.blockReplyPipeline;
       const onToolResult = params.opts?.onToolResult;
+      // Resolve fallbacks: per-agent overrides + orchestrator-aware fallback injection.
+      const agentFallbacks = resolveAgentModelFallbacksOverride(
+        params.followupRun.run.config,
+        resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
+      );
+      const orchestratorFallbacks = resolveOrchestratorFallbacksForRun({
+        cfg: params.followupRun.run.config,
+        runProvider: params.followupRun.run.provider,
+        runModel: params.followupRun.run.model,
+        agentFallbacks,
+      });
       const fallbackResult = await runWithModelFallback({
         cfg: params.followupRun.run.config,
         provider: params.followupRun.run.provider,
         model: params.followupRun.run.model,
         agentDir: params.followupRun.run.agentDir,
-        fallbacksOverride: resolveAgentModelFallbacksOverride(
-          params.followupRun.run.config,
-          resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
-        ),
+        fallbacksOverride: orchestratorFallbacks,
         run: (provider, model) => {
           // Notify that model selection is complete (including after fallback).
           // This allows responsePrefix template interpolation with the actual model.

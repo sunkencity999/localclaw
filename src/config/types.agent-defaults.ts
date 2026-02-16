@@ -100,6 +100,24 @@ export type AgentRoutingConfig = {
   maxSimpleLength?: number;
 };
 
+export type OrchestratorStrategy = "auto" | "always" | "fallback-only";
+
+export type AgentOrchestratorConfig = {
+  /** Enable orchestrator model (default: false). */
+  enabled?: boolean;
+  /** Powerful API model for complex tasks (provider/model string, e.g. "anthropic/claude-sonnet-4"). */
+  model?: string;
+  /**
+   * Routing strategy:
+   * - "auto": use orchestrator for complex tasks, local for simple ones (default).
+   * - "always": always try orchestrator first; fall back to local on failure.
+   * - "fallback-only": use local by default; escalate to orchestrator only when local fails.
+   */
+  strategy?: OrchestratorStrategy;
+  /** Max message length (chars) for complexity classification in "auto" mode (default: 150). */
+  maxSimpleLength?: number;
+};
+
 export type AgentDefaultsConfig = {
   /** Primary model and fallbacks (provider/model). */
   model?: AgentModelListConfig;
@@ -205,6 +223,8 @@ export type AgentDefaultsConfig = {
   };
   /** Smart model routing — route simple queries to a fast model. */
   routing?: AgentRoutingConfig;
+  /** Orchestrator model — route complex tasks to a powerful API model, keep local for simple/routine work. */
+  orchestrator?: AgentOrchestratorConfig;
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;
   /** Sub-agent defaults (spawned via sessions_spawn). */

@@ -20,7 +20,7 @@ import { CURRENT_MESSAGE_MARKER, stripMentions, stripStructuralPrefixes } from "
 import { createModelSelectionState, resolveContextTokens } from "./model-selection.js";
 import { formatElevatedUnavailableMessage, resolveElevatedPermissions } from "./reply-elevated.js";
 import { stripInlineStatus } from "./reply-inline.js";
-import { resolveSmartRoute } from "./smart-routing.js";
+import { resolveOrchestratorRoute, resolveSmartRoute } from "./smart-routing.js";
 
 type AgentDefaults = NonNullable<OpenClawConfig["agents"]>["defaults"];
 type ExecOverrides = Pick<ExecToolDefaults, "host" | "security" | "ask" | "node">;
@@ -397,6 +397,7 @@ export async function resolveReplyDirectives(params: {
   model = modelState.model;
 
   // Smart routing: route simple queries to a fast model (unless user set /model)
+  let smartRouted = false;
   if (!directives.hasModelDirective) {
     const route = resolveSmartRoute({
       message: cleanedBody,
@@ -408,6 +409,23 @@ export async function resolveReplyDirectives(params: {
     if (route.routed) {
       provider = route.provider;
       model = route.model;
+      smartRouted = true;
+    }
+  }
+
+  // Orchestrator routing: route complex tasks to a powerful API model (unless user set /model
+  // or smart routing already routed the message).
+  if (!directives.hasModelDirective && !smartRouted) {
+    const orchRoute = resolveOrchestratorRoute({
+      message: cleanedBody,
+      cfg,
+      currentProvider: provider,
+      currentModel: model,
+      defaultProvider,
+    });
+    if (orchRoute.routed) {
+      provider = orchRoute.provider;
+      model = orchRoute.model;
     }
   }
 
