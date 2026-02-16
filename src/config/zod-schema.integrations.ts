@@ -49,6 +49,8 @@ export const EmailAccountSchema = z.object({
   address: z.string(),
   /** Human-friendly label for this account (e.g. "home", "work") */
   label: z.string().optional(),
+  /** gog OAuth client name (for Workspace accounts using custom credentials) */
+  client: z.string().optional(),
 });
 
 export const EmailIntegrationSchema = z

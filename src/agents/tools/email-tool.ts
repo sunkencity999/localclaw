@@ -43,8 +43,10 @@ const EmailToolSchema = Type.Object({
   ),
 });
 
+type EmailAccount = { address: string; label?: string; client?: string };
+
 type EmailConfig = {
-  accounts: Array<{ address: string; label?: string }>;
+  accounts: EmailAccount[];
   defaultAccount: string;
   timeoutMs: number;
 };
@@ -60,23 +62,29 @@ function resolveEmailConfig(config?: OpenClawConfig): EmailConfig | null {
   return { accounts, defaultAccount, timeoutMs };
 }
 
-function resolveAccount(cfg: EmailConfig, accountInput?: string): string {
-  if (!accountInput) return cfg.defaultAccount;
+function resolveAccountEntry(cfg: EmailConfig, accountInput?: string): EmailAccount {
+  const fallback: EmailAccount = { address: accountInput?.trim() || cfg.defaultAccount };
+  const haystack = cfg.accounts;
+  if (!accountInput) {
+    return haystack.find((a) => a.address === cfg.defaultAccount) ?? fallback;
+  }
   const trimmed = accountInput.trim().toLowerCase();
-  // Match by label first
-  const byLabel = cfg.accounts.find((a) => a.label?.toLowerCase() === trimmed);
-  if (byLabel) return byLabel.address;
-  // Match by address
-  const byAddress = cfg.accounts.find((a) => a.address.toLowerCase() === trimmed);
-  if (byAddress) return byAddress.address;
-  // Partial match (starts with)
-  const byPartial = cfg.accounts.find(
+  const byLabel = haystack.find((a) => a.label?.toLowerCase() === trimmed);
+  if (byLabel) return byLabel;
+  const byAddress = haystack.find((a) => a.address.toLowerCase() === trimmed);
+  if (byAddress) return byAddress;
+  const byPartial = haystack.find(
     (a) =>
       a.address.toLowerCase().startsWith(trimmed) || a.label?.toLowerCase().startsWith(trimmed),
   );
-  if (byPartial) return byPartial.address;
-  // Fall back to input as-is (user may have typed a full address not in config)
-  return accountInput.trim();
+  if (byPartial) return byPartial;
+  return fallback;
+}
+
+function accountArgs(entry: EmailAccount): string[] {
+  const args = ["--account", entry.address];
+  if (entry.client) args.push("--client", entry.client);
+  return args;
 }
 
 async function runGog(
@@ -131,9 +139,9 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
         readNumberParam(params, "maxResults", { integer: true }) ?? 10,
         50,
       );
-      const account = resolveAccount(cfg, accountInput);
+      const entry = resolveAccountEntry(cfg, accountInput);
       const result = await runGog(
-        ["gmail", "search", query, "--account", account, "--max", String(maxResults), "--json"],
+        ["gmail", "search", query, ...accountArgs(entry), "--max", String(maxResults), "--json"],
         cfg.timeoutMs,
       );
       if (!result.ok) {
@@ -146,22 +154,24 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       if (!data || (Array.isArray(data) && data.length === 0)) {
         return {
           content: [
-            { type: "text" as const, text: `No results for: ${query} (account: ${account})` },
+            { type: "text" as const, text: `No results for: ${query} (account: ${entry.address})` },
           ],
-          details: { account, query, count: 0 },
+          details: { account: entry.address, query, count: 0 },
         };
       }
       return jsonResult({
-        content: [{ type: "text", text: `Search results for "${query}" (account: ${account}):` }],
-        details: { account, query, results: data },
+        content: [
+          { type: "text", text: `Search results for "${query}" (account: ${entry.address}):` },
+        ],
+        details: { account: entry.address, query, results: data },
       });
     }
 
     case "read_message": {
       const messageId = readStringParam(params, "messageId", { required: true });
-      const account = resolveAccount(cfg, accountInput);
+      const entry = resolveAccountEntry(cfg, accountInput);
       const result = await runGog(
-        ["gmail", "get", messageId, "--account", account, "--format", "full", "--json"],
+        ["gmail", "get", messageId, ...accountArgs(entry), "--format", "full", "--json"],
         cfg.timeoutMs,
       );
       if (!result.ok) {
@@ -180,8 +190,8 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       if (typeof msg.body === "string") msg.body = truncateBody(msg.body);
       if (typeof msg.bodyHtml === "string") msg.bodyHtml = truncateBody(msg.bodyHtml);
       return jsonResult({
-        content: [{ type: "text", text: `Message ${messageId} (account: ${account}):` }],
-        details: { account, message: msg },
+        content: [{ type: "text", text: `Message ${messageId} (account: ${entry.address}):` }],
+        details: { account: entry.address, message: msg },
       });
     }
 
@@ -190,13 +200,12 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       const subject = readStringParam(params, "subject", { required: true });
       const body = readStringParam(params, "body", { required: true });
       const cc = readStringParam(params, "cc");
-      const account = resolveAccount(cfg, accountInput);
+      const entry = resolveAccountEntry(cfg, accountInput);
 
       const args = [
         "gmail",
         "send",
-        "--account",
-        account,
+        ...accountArgs(entry),
         "--to",
         to,
         "--subject",
@@ -217,8 +226,10 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
         };
       }
       return jsonResult({
-        content: [{ type: "text", text: `Email sent from ${account} to ${to}: "${subject}"` }],
-        details: { account, to, subject, result: result.data },
+        content: [
+          { type: "text", text: `Email sent from ${entry.address} to ${to}: "${subject}"` },
+        ],
+        details: { account: entry.address, to, subject, result: result.data },
       });
     }
 
@@ -227,7 +238,7 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       const messageId = readStringParam(params, "messageId");
       const threadId = readStringParam(params, "threadId");
       const replyAll = params.replyAll === true;
-      const account = resolveAccount(cfg, accountInput);
+      const entry = resolveAccountEntry(cfg, accountInput);
 
       if (!messageId && !threadId) {
         return {
@@ -244,8 +255,7 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       const args = [
         "gmail",
         "send",
-        "--account",
-        account,
+        ...accountArgs(entry),
         "--body",
         body,
         "--force",
@@ -271,17 +281,17 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
         content: [
           {
             type: "text",
-            text: `Reply sent from ${account}${replyAll ? " (reply-all)" : ""}: ${messageId ?? threadId}`,
+            text: `Reply sent from ${entry.address}${replyAll ? " (reply-all)" : ""}: ${messageId ?? threadId}`,
           },
         ],
-        details: { account, messageId, threadId, replyAll, result: result.data },
+        details: { account: entry.address, messageId, threadId, replyAll, result: result.data },
       });
     }
 
     case "list_labels": {
-      const account = resolveAccount(cfg, accountInput);
+      const entry = resolveAccountEntry(cfg, accountInput);
       const result = await runGog(
-        ["gmail", "labels", "list", "--account", account, "--json"],
+        ["gmail", "labels", "list", ...accountArgs(entry), "--json"],
         cfg.timeoutMs,
       );
       if (!result.ok) {
@@ -291,8 +301,8 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
         };
       }
       return jsonResult({
-        content: [{ type: "text", text: `Labels for ${account}:` }],
-        details: { account, labels: result.data },
+        content: [{ type: "text", text: `Labels for ${entry.address}:` }],
+        details: { account: entry.address, labels: result.data },
       });
     }
 
