@@ -279,9 +279,9 @@ Connect Slack to let the agent read and send DMs, post to channels, search conve
 | **Read DMs** | Find any person by username and read your DM conversation with them |
 | **Send DMs** | Send a direct message to any user by username — appears as you |
 | **Post messages** | Send messages to any channel or thread, with link unfurling control |
-| **Channel history** | Read recent messages from any channel (up to 200 messages) |
+| **Channel history** | Read recent messages from any channel by name or ID, with automatic user name resolution (up to 200 messages) |
 | **List DMs** | Browse your 50 most recent DM conversations with user names |
-| **Thread replies** | Fetch all replies in a specific thread |
+| **Thread replies** | Fetch all replies in a specific thread, with automatic user name resolution |
 | **Search messages** | Full-text search across the workspace (auto-detects usernames and includes DM history) |
 | **Find users** | Search for users by name, username, or email |
 | **List channels** | Enumerate public and private channels with topic, purpose, and membership |
@@ -323,6 +323,7 @@ Connect Slack to let the agent read and send DMs, post to channels, search conve
 | `users:read` | Looking up user info |
 | `users:read.email` | Reading user email addresses |
 | `reactions:write` | Adding emoji reactions |
+| `channels:join` | Auto-joining public channels when the bot needs to read history |
 | `channels:manage` | Setting channel topics |
 
 **User Token Scopes** (under "User Token Scopes" in OAuth & Permissions):
@@ -373,12 +374,24 @@ Connect Slack to let the agent read and send DMs, post to channels, search conve
 - *"Who is user U01234ABCDE?"* — agent looks up the user and returns their name and email
 - *"React to the last message in #general with :thumbsup:"* — agent adds the emoji reaction
 
+#### Smart Channel Access
+
+The Slack integration includes several quality-of-life features:
+
+- **Channel name resolution** — Use `#channel-name` or just `channel-name` in requests. The agent automatically resolves human-friendly names to Slack channel IDs. No need to know or copy channel IDs.
+- **Auto-join** — When the bot encounters a public channel it hasn't joined yet, it automatically calls `conversations.join` and retries. No manual `/invite` needed for public channels.
+- **User name resolution** — Channel history and thread replies display real names (e.g. `Dan Burke`) alongside user IDs, so you can immediately see who said what.
+
+> **Private channels** still require a manual invite — have a channel admin add the bot via the channel's **Integrations** settings.
+
 #### Troubleshooting
 
 - **"channel_not_found" on DM operations** — Make sure you have a `userToken` configured. Bot tokens can't access user DMs.
 - **"missing_scope" errors** — Check that your Slack App has all the required scopes listed above, then reinstall the app to your workspace.
 - **Search returns no results** — The `search:read` scope must be on the *User Token Scopes*, not the Bot Token Scopes. Slack's `search.messages` API only works with user tokens.
 - **DMs appear from the bot instead of you** — Ensure `userToken` is set. When present, DM operations automatically use the user token so messages appear from your account.
+- **"not_in_channel" on a public channel** — The bot should auto-join automatically. If it still fails, ensure the `channels:join` bot scope is granted and the app is reinstalled to the workspace.
+- **"not_in_channel" on a private channel** — Private channels require manual invite. Go to the channel → settings → **Integrations** → **Add apps** → select your bot.
 
 ---
 
