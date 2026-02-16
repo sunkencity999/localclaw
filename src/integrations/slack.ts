@@ -130,9 +130,30 @@ export class SlackClient {
     };
   }
 
+  async joinChannel(channel: string): Promise<void> {
+    await this.request("conversations.join", { channel });
+  }
+
   async getChannelHistory(channel: string, limit = 20): Promise<SlackMessage[]> {
     // Use userToken for DM channels (IDs start with D) so we can read the user's DMs.
     const token = channel.startsWith("D") && this.userToken ? this.userToken : undefined;
+    const opts = token ? { token } : undefined;
+    try {
+      return await this.fetchHistory(channel, limit, opts);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not_in_channel")) {
+        await this.joinChannel(channel);
+        return this.fetchHistory(channel, limit, opts);
+      }
+      throw err;
+    }
+  }
+
+  private async fetchHistory(
+    channel: string,
+    limit: number,
+    opts?: { token?: string },
+  ): Promise<SlackMessage[]> {
     const result = await this.request<{
       messages: Array<{
         ts: string;
@@ -140,7 +161,7 @@ export class SlackClient {
         user?: string;
         thread_ts?: string;
       }>;
-    }>("conversations.history", { channel, limit }, token ? { token } : undefined);
+    }>("conversations.history", { channel, limit }, opts);
 
     return result.messages.map((msg) => ({
       ts: msg.ts,
@@ -153,6 +174,23 @@ export class SlackClient {
 
   async getThreadReplies(channel: string, threadTs: string): Promise<SlackMessage[]> {
     const token = channel.startsWith("D") && this.userToken ? this.userToken : undefined;
+    const opts = token ? { token } : undefined;
+    try {
+      return await this.fetchReplies(channel, threadTs, opts);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not_in_channel")) {
+        await this.joinChannel(channel);
+        return this.fetchReplies(channel, threadTs, opts);
+      }
+      throw err;
+    }
+  }
+
+  private async fetchReplies(
+    channel: string,
+    threadTs: string,
+    opts?: { token?: string },
+  ): Promise<SlackMessage[]> {
     const result = await this.request<{
       messages: Array<{
         ts: string;
@@ -160,7 +198,7 @@ export class SlackClient {
         user?: string;
         thread_ts?: string;
       }>;
-    }>("conversations.replies", { channel, ts: threadTs }, token ? { token } : undefined);
+    }>("conversations.replies", { channel, ts: threadTs }, opts);
 
     return result.messages.map((msg) => ({
       ts: msg.ts,
