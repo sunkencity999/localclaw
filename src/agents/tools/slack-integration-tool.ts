@@ -49,12 +49,15 @@ export function createSlackIntegrationTool(options?: {
     label: "Slack Integration",
     name: "slack_integration",
     description: [
-      "Slack integration for posting messages, reading channels, DMs, and searching.",
-      "IMPORTANT: To read DMs with a specific person, use read_dm with query set to their",
-      "name or username (e.g. query='ryan.valencia'). This finds the user, opens the DM,",
-      "and returns messages in a single call. Use list_dms to see recent DM conversations.",
-      "Other actions: post_message, channel_history, thread_replies, find_user, open_dm,",
-      "search_messages, list_channels, lookup_user, add_reaction, set_topic.",
+      "Slack workspace integration.",
+      "RULE: When asked to find or read DMs with a SPECIFIC PERSON, you MUST use action=read_dm",
+      "with query set to their username (e.g. query='ryan.valencia' or query='john.smith').",
+      "read_dm finds the user, opens the DM, and returns messages in ONE call.",
+      "Do NOT use list_dms + channel_history to find a specific person — list_dms only shows",
+      "the 20 most recent DMs and will miss older conversations.",
+      "list_dms: browse recent DM conversations. channel_history: read a known channel.",
+      "Other: post_message, thread_replies, search_messages, list_channels, lookup_user,",
+      "find_user, open_dm, add_reaction, set_topic.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
     execute: async (_toolCallId, args) => {
@@ -180,8 +183,13 @@ async function executeSlackAction(
         const preview = dm.latest?.text ? ` | ${dm.latest.text.slice(0, 100)}` : "";
         lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
       }
+      const hint =
+        "\n\nNOTE: This only shows the most recent DMs. To find a specific person's DMs " +
+        "(even older ones), use action=read_dm with query=their_username instead.";
       return {
-        content: [{ type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}` }],
+        content: [
+          { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}${hint}` },
+        ],
         details: { count: dms.length, dms },
       };
     }
