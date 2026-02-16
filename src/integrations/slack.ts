@@ -230,27 +230,23 @@ export class SlackClient {
       }>;
     }>("conversations.list", { types: "im", limit, exclude_archived: true }, { token });
 
-    // Batch-resolve user IDs to names so the model can identify conversations.
+    // Resolve all user IDs to names in parallel (single batch).
     const userIds = result.channels.map((dm) => dm.user).filter(Boolean);
     const nameMap = new Map<string, { name: string; realName: string | null }>();
-    const batchSize = 10;
-    for (let i = 0; i < userIds.length; i += batchSize) {
-      const batch = userIds.slice(i, i + batchSize);
-      const lookups = await Promise.allSettled(
-        batch.map((uid) =>
-          this.request<{
-            user: { id: string; name: string; real_name?: string };
-          }>("users.info", { user: uid }).then((r) => ({
-            id: uid,
-            name: r.user.name,
-            realName: r.user.real_name ?? null,
-          })),
-        ),
-      );
-      for (const r of lookups) {
-        if (r.status === "fulfilled") {
-          nameMap.set(r.value.id, { name: r.value.name, realName: r.value.realName });
-        }
+    const lookups = await Promise.allSettled(
+      userIds.map((uid) =>
+        this.request<{
+          user: { id: string; name: string; real_name?: string };
+        }>("users.info", { user: uid }).then((r) => ({
+          id: uid,
+          name: r.user.name,
+          realName: r.user.real_name ?? null,
+        })),
+      ),
+    );
+    for (const r of lookups) {
+      if (r.status === "fulfilled") {
+        nameMap.set(r.value.id, { name: r.value.name, realName: r.value.realName });
       }
     }
 
@@ -274,13 +270,68 @@ export class SlackClient {
     });
   }
 
-  /** Search for users by name, username, or email. Paginates through the full workspace roster. */
+  /**
+   * Search for users by name, username, or email.
+   * Primary strategy: use search.messages from:<query> (fast, works for large workspaces).
+   * Fallback: paginated users.list (slower, for users who never posted).
+   */
   async findUsers(query: string, limit = 10): Promise<SlackUser[]> {
+    // Fast path: search.messages from:<query> returns user IDs instantly.
+    if (this.userToken) {
+      try {
+        const searchResult = await this.request<{
+          messages: {
+            matches: Array<{ user?: string; username?: string }>;
+          };
+        }>("search.messages", { query: `from:${query}`, count: 20 }, { token: this.userToken });
+        // Collect unique user IDs from search results.
+        const seen = new Set<string>();
+        const userIds: string[] = [];
+        for (const m of searchResult.messages.matches) {
+          const uid = m.user;
+          if (uid && !seen.has(uid)) {
+            seen.add(uid);
+            userIds.push(uid);
+            if (userIds.length >= limit) break;
+          }
+        }
+        if (userIds.length > 0) {
+          // Resolve user IDs to full profiles in parallel.
+          const results = await Promise.allSettled(
+            userIds.map((uid) =>
+              this.request<{
+                user: {
+                  id: string;
+                  name: string;
+                  real_name?: string;
+                  profile?: { email?: string };
+                  is_bot: boolean;
+                };
+              }>("users.info", { user: uid }).then((r) => ({
+                id: r.user.id,
+                name: r.user.name,
+                realName: r.user.real_name ?? null,
+                email: r.user.profile?.email ?? null,
+                isBot: r.user.is_bot,
+              })),
+            ),
+          );
+          const users: SlackUser[] = [];
+          for (const r of results) {
+            if (r.status === "fulfilled") users.push(r.value);
+          }
+          if (users.length > 0) return users;
+        }
+      } catch {
+        // Fall through to users.list pagination.
+      }
+    }
+
+    // Fallback: paginate users.list (cap at 3 pages / 600 users).
     const q = query.toLowerCase();
     const matches: SlackUser[] = [];
     let cursor: string | undefined;
-    // Paginate through users.list to find matches (Slack has no server-side name search).
-    for (let page = 0; page < 20 && matches.length < limit; page++) {
+    for (let page = 0; page < 3 && matches.length < limit; page++) {
       const params: Record<string, unknown> = { limit: 200 };
       if (cursor) params.cursor = cursor;
       const result = await this.request<{

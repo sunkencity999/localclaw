@@ -1,3 +1,4 @@
+import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import { createSlackClient } from "../../integrations/slack.js";
@@ -64,190 +65,201 @@ export function createSlackIntegrationTool(options?: {
           ? params.action.trim()
           : "list_channels";
 
-      switch (action) {
-        case "post_message": {
-          const text = readStringParam(params, "text", { required: true });
-          const channel = readStringParam(params, "channel");
-          const threadTs = readStringParam(params, "threadTs");
-          const result = await client.postMessage({
-            channel: channel ?? "",
-            text,
-            threadTs,
-          });
-          return {
-            content: [{ type: "text", text: `Message posted to ${result.channel}` }],
-            details: result,
-          };
-        }
-
-        case "channel_history": {
-          const channel = readStringParam(params, "channel", { required: true });
-          const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
-          const messages = await client.getChannelHistory(
-            channel,
-            Math.max(1, Math.min(100, limit)),
-          );
-          const text =
-            messages.length > 0
-              ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
-              : "No messages found.";
-          return {
-            content: [{ type: "text", text }],
-            details: { channel, count: messages.length, messages },
-          };
-        }
-
-        case "thread_replies": {
-          const channel = readStringParam(params, "channel", { required: true });
-          const threadTs = readStringParam(params, "threadTs", { required: true });
-          const messages = await client.getThreadReplies(channel, threadTs);
-          const text =
-            messages.length > 0
-              ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
-              : "No replies found.";
-          return {
-            content: [{ type: "text", text }],
-            details: { channel, threadTs, count: messages.length, messages },
-          };
-        }
-
-        case "list_dms": {
-          const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
-          const dms = await client.listDMs(Math.max(1, Math.min(50, limit)));
-          if (dms.length === 0) {
-            return {
-              content: [{ type: "text", text: "No DM conversations found." }],
-              details: { count: 0 },
-            };
-          }
-          const lines: string[] = [];
-          for (const dm of dms) {
-            const name = dm.realName ?? dm.userName ?? dm.user;
-            const preview = dm.latest?.text ? ` | ${dm.latest.text.slice(0, 100)}` : "";
-            lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
-          }
-          return {
-            content: [
-              { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}` },
-            ],
-            details: { count: dms.length, dms },
-          };
-        }
-
-        case "find_user": {
-          const query = readStringParam(params, "query", { required: true });
-          const limit = readNumberParam(params, "limit", { integer: true }) ?? 10;
-          const users = await client.findUsers(query, Math.max(1, Math.min(25, limit)));
-          if (users.length === 0) {
-            return {
-              content: [{ type: "text", text: `No users found matching "${query}".` }],
-              details: { count: 0 },
-            };
-          }
-          const text = users
-            .map(
-              (u) =>
-                `${u.id} — ${u.realName ?? u.name} (${u.name})${u.email ? ` <${u.email}>` : ""}`,
-            )
-            .join("\n");
-          return {
-            content: [{ type: "text", text: `${users.length} user(s) found:\n${text}` }],
-            details: { count: users.length, users },
-          };
-        }
-
-        case "open_dm": {
-          const userId = readStringParam(params, "userId", { required: true });
-          const result = await client.openDM(userId);
-          return {
-            content: [
-              {
-                type: "text",
-                text: `DM channel opened: ${result.channelId} (use channel_history to read messages)`,
-              },
-            ],
-            details: result,
-          };
-        }
-
-        case "search_messages": {
-          const query = readStringParam(params, "query", { required: true });
-          const limit = readNumberParam(params, "limit", { integer: true });
-          const result = await client.searchMessages({
-            query,
-            count: limit ? Math.max(1, Math.min(100, limit)) : undefined,
-          });
-          const text =
-            result.messages.length > 0
-              ? result.messages
-                  .map((m) => `[${m.channel}] ${m.user ?? "unknown"}: ${m.text}`)
-                  .join("\n")
-              : "No messages found.";
-          return {
-            content: [{ type: "text", text: `${result.total} result(s)\n${text}` }],
-            details: result,
-          };
-        }
-
-        case "list_channels": {
-          const limit = readNumberParam(params, "limit", { integer: true }) ?? 100;
-          const channels = await client.listChannels(Math.max(1, Math.min(1000, limit)));
-          const text =
-            channels.length > 0
-              ? channels
-                  .map(
-                    (c) =>
-                      `${c.name} (${c.id})${c.isPrivate ? " [private]" : ""}${c.topic ? ` - ${c.topic}` : ""}`,
-                  )
-                  .join("\n")
-              : "No channels found.";
-          return {
-            content: [{ type: "text", text }],
-            details: { count: channels.length, channels },
-          };
-        }
-
-        case "lookup_user": {
-          const userId = readStringParam(params, "userId", { required: true });
-          const user = await client.lookupUser(userId);
-          const text = [
-            `${user.name} (${user.id})`,
-            user.realName ? `Name: ${user.realName}` : null,
-            user.email ? `Email: ${user.email}` : null,
-            user.isBot ? "Bot: yes" : null,
-          ]
-            .filter(Boolean)
-            .join("\n");
-          return {
-            content: [{ type: "text", text }],
-            details: user,
-          };
-        }
-
-        case "add_reaction": {
-          const channel = readStringParam(params, "channel", { required: true });
-          const timestamp = readStringParam(params, "timestamp", { required: true });
-          const emoji = readStringParam(params, "emoji", { required: true });
-          await client.addReaction(channel, timestamp, emoji.replace(/^:|:$/g, ""));
-          return {
-            content: [{ type: "text", text: `Reaction :${emoji}: added` }],
-            details: { channel, timestamp, emoji },
-          };
-        }
-
-        case "set_topic": {
-          const channel = readStringParam(params, "channel", { required: true });
-          const topic = readStringParam(params, "topic", { required: true });
-          await client.setChannelTopic(channel, topic);
-          return {
-            content: [{ type: "text", text: `Topic set on ${channel}` }],
-            details: { channel, topic },
-          };
-        }
-
-        default:
-          throw new Error(`Unknown slack_integration action: ${action}`);
+      const t0 = Date.now();
+      console.log(`[slack-tool] action=${action} params=${JSON.stringify(params)}`);
+      try {
+        const result = await executeSlackAction(action, params, client);
+        console.log(`[slack-tool] action=${action} done in ${Date.now() - t0}ms`);
+        return result;
+      } catch (err) {
+        console.log(`[slack-tool] action=${action} error after ${Date.now() - t0}ms: ${err}`);
+        throw err;
       }
     },
   };
+}
+
+async function executeSlackAction(
+  action: string,
+  params: Record<string, unknown>,
+  client: NonNullable<ReturnType<typeof createSlackClient>>,
+): Promise<AgentToolResult<unknown>> {
+  switch (action) {
+    case "post_message": {
+      const text = readStringParam(params, "text", { required: true });
+      const channel = readStringParam(params, "channel");
+      const threadTs = readStringParam(params, "threadTs");
+      const result = await client.postMessage({
+        channel: channel ?? "",
+        text,
+        threadTs,
+      });
+      return {
+        content: [{ type: "text", text: `Message posted to ${result.channel}` }],
+        details: result,
+      };
+    }
+
+    case "channel_history": {
+      const channel = readStringParam(params, "channel", { required: true });
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
+      const messages = await client.getChannelHistory(channel, Math.max(1, Math.min(100, limit)));
+      const text =
+        messages.length > 0
+          ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+          : "No messages found.";
+      return {
+        content: [{ type: "text", text }],
+        details: { channel, count: messages.length, messages },
+      };
+    }
+
+    case "thread_replies": {
+      const channel = readStringParam(params, "channel", { required: true });
+      const threadTs = readStringParam(params, "threadTs", { required: true });
+      const messages = await client.getThreadReplies(channel, threadTs);
+      const text =
+        messages.length > 0
+          ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+          : "No replies found.";
+      return {
+        content: [{ type: "text", text }],
+        details: { channel, threadTs, count: messages.length, messages },
+      };
+    }
+
+    case "list_dms": {
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
+      const dms = await client.listDMs(Math.max(1, Math.min(50, limit)));
+      if (dms.length === 0) {
+        return {
+          content: [{ type: "text", text: "No DM conversations found." }],
+          details: { count: 0 },
+        };
+      }
+      const lines: string[] = [];
+      for (const dm of dms) {
+        const name = dm.realName ?? dm.userName ?? dm.user;
+        const preview = dm.latest?.text ? ` | ${dm.latest.text.slice(0, 100)}` : "";
+        lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
+      }
+      return {
+        content: [{ type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}` }],
+        details: { count: dms.length, dms },
+      };
+    }
+
+    case "find_user": {
+      const query = readStringParam(params, "query", { required: true });
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? 10;
+      const users = await client.findUsers(query, Math.max(1, Math.min(25, limit)));
+      if (users.length === 0) {
+        return {
+          content: [{ type: "text", text: `No users found matching "${query}".` }],
+          details: { count: 0 },
+        };
+      }
+      const text = users
+        .map(
+          (u) => `${u.id} — ${u.realName ?? u.name} (${u.name})${u.email ? ` <${u.email}>` : ""}`,
+        )
+        .join("\n");
+      return {
+        content: [{ type: "text", text: `${users.length} user(s) found:\n${text}` }],
+        details: { count: users.length, users },
+      };
+    }
+
+    case "open_dm": {
+      const userId = readStringParam(params, "userId", { required: true });
+      const result = await client.openDM(userId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `DM channel opened: ${result.channelId} (use channel_history to read messages)`,
+          },
+        ],
+        details: result,
+      };
+    }
+
+    case "search_messages": {
+      const query = readStringParam(params, "query", { required: true });
+      const limit = readNumberParam(params, "limit", { integer: true });
+      const result = await client.searchMessages({
+        query,
+        count: limit ? Math.max(1, Math.min(100, limit)) : undefined,
+      });
+      const text =
+        result.messages.length > 0
+          ? result.messages
+              .map((m) => `[${m.channel}] ${m.user ?? "unknown"}: ${m.text}`)
+              .join("\n")
+          : "No messages found.";
+      return {
+        content: [{ type: "text", text: `${result.total} result(s)\n${text}` }],
+        details: result,
+      };
+    }
+
+    case "list_channels": {
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? 100;
+      const channels = await client.listChannels(Math.max(1, Math.min(1000, limit)));
+      const text =
+        channels.length > 0
+          ? channels
+              .map(
+                (c) =>
+                  `${c.name} (${c.id})${c.isPrivate ? " [private]" : ""}${c.topic ? ` - ${c.topic}` : ""}`,
+              )
+              .join("\n")
+          : "No channels found.";
+      return {
+        content: [{ type: "text", text }],
+        details: { count: channels.length, channels },
+      };
+    }
+
+    case "lookup_user": {
+      const userId = readStringParam(params, "userId", { required: true });
+      const user = await client.lookupUser(userId);
+      const text = [
+        `${user.name} (${user.id})`,
+        user.realName ? `Name: ${user.realName}` : null,
+        user.email ? `Email: ${user.email}` : null,
+        user.isBot ? "Bot: yes" : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return {
+        content: [{ type: "text", text }],
+        details: user,
+      };
+    }
+
+    case "add_reaction": {
+      const channel = readStringParam(params, "channel", { required: true });
+      const timestamp = readStringParam(params, "timestamp", { required: true });
+      const emoji = readStringParam(params, "emoji", { required: true });
+      await client.addReaction(channel, timestamp, emoji.replace(/^:|:$/g, ""));
+      return {
+        content: [{ type: "text", text: `Reaction :${emoji}: added` }],
+        details: { channel, timestamp, emoji },
+      };
+    }
+
+    case "set_topic": {
+      const channel = readStringParam(params, "channel", { required: true });
+      const topic = readStringParam(params, "topic", { required: true });
+      await client.setChannelTopic(channel, topic);
+      return {
+        content: [{ type: "text", text: `Topic set on ${channel}` }],
+        details: { channel, topic },
+      };
+    }
+
+    default:
+      throw new Error(`Unknown slack_integration action: ${action}`);
+  }
 }
