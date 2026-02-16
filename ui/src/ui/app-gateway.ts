@@ -51,6 +51,13 @@ type GatewayHost = {
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
+  orchestratorSnapshot: OrchestratorSnapshot | null;
+};
+
+export type OrchestratorSnapshot = {
+  enabled: boolean;
+  model?: string;
+  strategy?: string;
 };
 
 type SessionDefaultsSnapshot = {
@@ -261,6 +268,7 @@ export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
         presence?: PresenceEntry[];
         health?: HealthSnapshot;
         sessionDefaults?: SessionDefaultsSnapshot;
+        orchestrator?: OrchestratorSnapshot;
       }
     | undefined;
   if (snapshot?.presence && Array.isArray(snapshot.presence)) {
@@ -272,4 +280,5 @@ export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   if (snapshot?.sessionDefaults) {
     applySessionDefaults(host, snapshot.sessionDefaults);
   }
+  host.orchestratorSnapshot = snapshot?.orchestrator ?? null;
 }

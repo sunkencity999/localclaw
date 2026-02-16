@@ -5,6 +5,12 @@ import { resolveCliName } from "../assistant-identity";
 import { formatAgo, formatDurationMs } from "../format";
 import { formatNextRun } from "../presenter";
 
+export type OrchestratorOverview = {
+  enabled: boolean;
+  model?: string;
+  strategy?: string;
+};
+
 export type OverviewProps = {
   connected: boolean;
   hello: GatewayHelloOk | null;
@@ -16,6 +22,7 @@ export type OverviewProps = {
   cronEnabled: boolean | null;
   cronNext: number | null;
   lastChannelsRefresh: number | null;
+  orchestrator: OrchestratorOverview | null;
   onSettingsChange: (next: UiSettings) => void;
   onPasswordChange: (next: string) => void;
   onSessionKeyChange: (next: string) => void;
@@ -220,7 +227,7 @@ export function renderOverview(props: OverviewProps) {
       </div>
     </section>
 
-    <section class="grid grid-cols-3" style="margin-top: 18px;">
+    <section class="grid grid-cols-4" style="margin-top: 18px;">
       <div class="card stat-card">
         <div class="stat-label">Instances</div>
         <div class="stat-value">${props.presenceCount}</div>
@@ -237,6 +244,17 @@ export function renderOverview(props: OverviewProps) {
           ${props.cronEnabled == null ? "n/a" : props.cronEnabled ? "Enabled" : "Disabled"}
         </div>
         <div class="muted">Next wake ${formatNextRun(props.cronNext)}</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Orchestrator</div>
+        <div class="stat-value ${props.orchestrator?.enabled ? "ok" : ""}">
+          ${props.orchestrator?.enabled ? "Enabled" : "Off"}
+        </div>
+        <div class="muted">
+          ${props.orchestrator?.enabled && props.orchestrator.model
+            ? html`${props.orchestrator.model}<br/>strategy: ${props.orchestrator.strategy ?? "auto"}`
+            : "No orchestrator model configured."}
+        </div>
       </div>
     </section>
 

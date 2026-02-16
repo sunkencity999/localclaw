@@ -43,6 +43,15 @@ export const StateVersionSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const OrchestratorSnapshotSchema = Type.Object(
+  {
+    enabled: Type.Boolean(),
+    model: Type.Optional(NonEmptyString),
+    strategy: Type.Optional(NonEmptyString),
+  },
+  { additionalProperties: false },
+);
+
 export const SnapshotSchema = Type.Object(
   {
     presence: Type.Array(PresenceEntrySchema),
@@ -52,6 +61,7 @@ export const SnapshotSchema = Type.Object(
     configPath: Type.Optional(NonEmptyString),
     stateDir: Type.Optional(NonEmptyString),
     sessionDefaults: Type.Optional(SessionDefaultsSchema),
+    orchestrator: Type.Optional(OrchestratorSnapshotSchema),
   },
   { additionalProperties: false },
 );

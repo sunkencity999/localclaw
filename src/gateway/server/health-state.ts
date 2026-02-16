@@ -36,6 +36,17 @@ export function buildGatewaySnapshot(): Snapshot {
       mainSessionKey,
       scope,
     },
+    orchestrator: (() => {
+      const orch = cfg.agents?.defaults?.orchestrator;
+      if (!orch) {
+        return { enabled: false };
+      }
+      return {
+        enabled: orch.enabled === true,
+        model: orch.model ?? undefined,
+        strategy: orch.strategy ?? undefined,
+      };
+    })(),
   };
 }
 
