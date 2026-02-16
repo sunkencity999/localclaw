@@ -7,6 +7,7 @@ import { type AnyAgentTool, jsonResult, readStringParam, readNumberParam } from 
 
 const SLACK_INTEGRATION_ACTIONS = [
   "post_message",
+  "post_dm",
   "channel_history",
   "thread_replies",
   "read_dm",
@@ -54,7 +55,9 @@ export function createSlackIntegrationTool(options?: {
       "(e.g. query='ryan.valencia'). This searches the entire workspace and returns their DM",
       "messages directly — even if the DM is old. Without query, list_dms shows the 50 most",
       "recent DMs (limit up to 200). read_dm also works for this (same result).",
-      "Other: post_message, channel_history, thread_replies, search_messages, list_channels,",
+      "To SEND a DM: use action=post_dm with query=their_username and text=your_message.",
+      "post_message can also post to DMs if you have the DM channel ID (from list_dms/read_dm).",
+      "Other: channel_history, thread_replies, search_messages, list_channels,",
       "lookup_user, find_user, open_dm, add_reaction, set_topic.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
@@ -97,6 +100,38 @@ async function executeSlackAction(
       return {
         content: [{ type: "text", text: `Message posted to ${result.channel}` }],
         details: result,
+      };
+    }
+
+    case "post_dm": {
+      const query = readStringParam(params, "query", { required: true });
+      const text = readStringParam(params, "text", { required: true });
+      const users = await client.findUsers(query, 1);
+      if (users.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No user found matching "${query}". Try a more specific username.`,
+            },
+          ],
+          details: { query, found: false },
+        };
+      }
+      const user = users[0];
+      const dm = await client.openDM(user.id);
+      const result = await client.postMessage({
+        channel: dm.channelId,
+        text,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `DM sent to ${user.realName ?? user.name} (@${user.name}): "${text}"`,
+          },
+        ],
+        details: { user, channelId: dm.channelId, message: result },
       };
     }
 
