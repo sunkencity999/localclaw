@@ -274,19 +274,30 @@ async function promptOrchestratorConfig(
   let orchModel = currentModel;
 
   const WELL_KNOWN_ORCHESTRATOR_MODELS: Array<{ value: string; hint: string }> = [
+    // OpenAI Codex
     { value: "openai-codex/gpt-5.3-codex", hint: "most capable agentic coding model" },
     { value: "openai-codex/gpt-5.2-codex", hint: "advanced coding, real-world engineering" },
     { value: "openai-codex/gpt-5.1-codex-max", hint: "long-horizon agentic coding" },
     { value: "openai-codex/gpt-5.1-codex", hint: "long-running agentic coding" },
+    // OpenAI general
     { value: "openai/gpt-5.2", hint: "best general agentic model" },
     { value: "openai/gpt-5.1", hint: "coding + agentic tasks" },
-    { value: "anthropic/claude-sonnet-4", hint: "200K ctx, fast + capable" },
-    { value: "anthropic/claude-opus-4", hint: "200K ctx, most capable" },
     { value: "openai/gpt-4.1", hint: "1M ctx, strong reasoning" },
     { value: "openai/gpt-4.1-mini", hint: "1M ctx, fast + affordable" },
     { value: "openai/o4-mini", hint: "200K ctx, reasoning model" },
-    { value: "google/gemini-2.5-pro", hint: "1M ctx, multimodal" },
+    // Anthropic Claude
+    { value: "anthropic/claude-opus-4-6", hint: "latest, most capable Claude" },
+    { value: "anthropic/claude-sonnet-4-5", hint: "up to 1M ctx, strong + fast" },
+    { value: "anthropic/claude-sonnet-4", hint: "200K ctx, fast + capable" },
+    { value: "anthropic/claude-opus-4", hint: "200K ctx, deep reasoning" },
+    { value: "anthropic/claude-haiku-3-5", hint: "200K ctx, fastest Claude" },
+    // Google Gemini
+    { value: "google/gemini-3-pro", hint: "most powerful Gemini, multimodal" },
+    { value: "google/gemini-3-flash", hint: "balanced speed + intelligence" },
+    { value: "google/gemini-2.5-pro", hint: "1M ctx, strong reasoning" },
     { value: "google/gemini-2.5-flash", hint: "1M ctx, fast + affordable" },
+    { value: "google/gemini-2.5-flash-lite", hint: "1M ctx, lightweight" },
+    // Meta
     { value: "openrouter/auto", hint: "OpenRouter auto-routing" },
   ];
 
