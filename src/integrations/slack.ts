@@ -107,15 +107,21 @@ export class SlackClient {
     if (!channel) {
       throw new Error("Channel is required (set defaultChannel in config or pass explicitly)");
     }
+    // Use userToken for DM channels (IDs start with D) so the message is sent as the user.
+    const token = channel.startsWith("D") && this.userToken ? this.userToken : undefined;
     const result = await this.request<{
       message: { ts: string; text: string; user?: string };
       channel: string;
-    }>("chat.postMessage", {
-      channel,
-      text: params.text,
-      ...(params.threadTs ? { thread_ts: params.threadTs } : {}),
-      ...(params.unfurlLinks !== undefined ? { unfurl_links: params.unfurlLinks } : {}),
-    });
+    }>(
+      "chat.postMessage",
+      {
+        channel,
+        text: params.text,
+        ...(params.threadTs ? { thread_ts: params.threadTs } : {}),
+        ...(params.unfurlLinks !== undefined ? { unfurl_links: params.unfurlLinks } : {}),
+      },
+      { token: token ?? undefined },
+    );
     return {
       ts: result.message.ts,
       channel: result.channel,
