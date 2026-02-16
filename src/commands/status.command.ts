@@ -371,6 +371,17 @@ export async function statusCommand(
     { Item: "Probes", Value: probesValue },
     { Item: "Events", Value: eventsValue },
     { Item: "Heartbeat", Value: heartbeatValue },
+    (() => {
+      const orch = cfg.agents?.defaults?.orchestrator;
+      if (!orch || orch.enabled !== true || !orch.model) {
+        return { Item: "Orchestrator", Value: muted("off") };
+      }
+      const strategy = orch.strategy ?? "auto";
+      return {
+        Item: "Orchestrator",
+        Value: `${orch.model} · strategy: ${strategy}`,
+      };
+    })(),
     {
       Item: "Sessions",
       Value: `${summary.sessions.count} active · default ${defaults.model ?? "unknown"}${defaultCtx} · ${storeLabel}`,
