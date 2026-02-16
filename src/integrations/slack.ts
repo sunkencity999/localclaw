@@ -57,17 +57,15 @@ export class SlackClient {
     this.timeoutMs = (config.timeoutSeconds ?? 30) * 1000;
   }
 
-  private headersFor(token: string): Record<string, string> {
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json; charset=utf-8",
-    };
+  private authHeaderFor(token: string): Record<string, string> {
+    return { Authorization: `Bearer ${token}` };
   }
 
-  private get headers(): Record<string, string> {
-    return this.headersFor(this.botToken);
-  }
-
+  /**
+   * Make a Slack Web API call using application/x-www-form-urlencoded.
+   * Slack's API ignores JSON body params for many read methods, so
+   * form-urlencoded is the safest universal format.
+   */
   private async request<T>(
     method: string,
     body?: Record<string, unknown>,
@@ -75,10 +73,23 @@ export class SlackClient {
   ): Promise<T> {
     const token = opts?.token ?? this.botToken;
     const url = `https://slack.com/api/${method}`;
+    let fetchBody: string | undefined;
+    const headers: Record<string, string> = {
+      ...this.authHeaderFor(token),
+      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+    };
+    if (body) {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(body)) {
+        if (v === undefined || v === null) continue;
+        params.set(k, typeof v === "string" ? v : JSON.stringify(v));
+      }
+      fetchBody = params.toString();
+    }
     const response = await fetch(url, {
       method: "POST",
-      headers: this.headersFor(token),
-      body: body ? JSON.stringify(body) : undefined,
+      headers,
+      body: fetchBody,
       signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!response.ok) {
@@ -235,23 +246,7 @@ export class SlackClient {
           "Add a 'userToken' to your Slack integration config, or use 'list_channels' + 'channel_history' instead.",
       );
     }
-    // search.messages does NOT accept JSON POST — use GET with query params.
-    const qs = new URLSearchParams({
-      query: params.query,
-      count: String(params.count ?? 20),
-      sort: params.sort ?? "score",
-    });
-    const url = `https://slack.com/api/search.messages?${qs}`;
-    const response = await fetch(url, {
-      headers: this.headersFor(this.userToken),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!response.ok) {
-      throw new Error(`Slack HTTP error ${response.status}`);
-    }
-    const result = (await response.json()) as {
-      ok: boolean;
-      error?: string;
+    const result = await this.request<{
       messages: {
         total: number;
         matches: Array<{
@@ -261,10 +256,15 @@ export class SlackClient {
           channel: { id: string; name: string };
         }>;
       };
-    };
-    if (!result.ok) {
-      throw new Error(`Slack API error: ${result.error ?? "unknown"}`);
-    }
+    }>(
+      "search.messages",
+      {
+        query: params.query,
+        count: params.count ?? 20,
+        sort: params.sort ?? "score",
+      },
+      { token: this.userToken },
+    );
 
     return {
       messages: result.messages.matches.map((m) => ({
