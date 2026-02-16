@@ -134,6 +134,25 @@ export const AgentDefaultsSchema = z
         z.literal("message"),
       ])
       .optional(),
+    routing: z
+      .object({
+        enabled: z.boolean().optional(),
+        fastModel: z.string().optional(),
+        maxSimpleLength: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
+    orchestrator: z
+      .object({
+        enabled: z.boolean().optional(),
+        model: z.string().optional(),
+        strategy: z
+          .union([z.literal("auto"), z.literal("always"), z.literal("fallback-only")])
+          .optional(),
+        maxSimpleLength: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
     heartbeat: HeartbeatSchema,
     maxConcurrent: z.number().int().positive().optional(),
     subagents: z
