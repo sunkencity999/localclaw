@@ -14,5 +14,11 @@ export function buildProgram() {
 
   registerProgramCommands(program, ctx, argv);
 
+  // Show help and exit 0 (not 1) when no subcommand is given, so pnpm
+  // doesn't print a scary ELIFECYCLE error on bare `pnpm localclaw`.
+  program.action(() => {
+    program.help({ error: false });
+  });
+
   return program;
 }
