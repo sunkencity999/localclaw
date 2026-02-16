@@ -125,6 +125,8 @@ export class SlackClient {
   }
 
   async getChannelHistory(channel: string, limit = 20): Promise<SlackMessage[]> {
+    // Use userToken for DM channels (IDs start with D) so we can read the user's DMs.
+    const token = channel.startsWith("D") && this.userToken ? this.userToken : undefined;
     const result = await this.request<{
       messages: Array<{
         ts: string;
@@ -132,7 +134,7 @@ export class SlackClient {
         user?: string;
         thread_ts?: string;
       }>;
-    }>("conversations.history", { channel, limit });
+    }>("conversations.history", { channel, limit }, token ? { token } : undefined);
 
     return result.messages.map((msg) => ({
       ts: msg.ts,
@@ -144,6 +146,7 @@ export class SlackClient {
   }
 
   async getThreadReplies(channel: string, threadTs: string): Promise<SlackMessage[]> {
+    const token = channel.startsWith("D") && this.userToken ? this.userToken : undefined;
     const result = await this.request<{
       messages: Array<{
         ts: string;
@@ -151,7 +154,7 @@ export class SlackClient {
         user?: string;
         thread_ts?: string;
       }>;
-    }>("conversations.replies", { channel, ts: threadTs });
+    }>("conversations.replies", { channel, ts: threadTs }, token ? { token } : undefined);
 
     return result.messages.map((msg) => ({
       ts: msg.ts,
@@ -211,13 +214,15 @@ export class SlackClient {
   async listDMs(
     limit = 20,
   ): Promise<Array<{ id: string; user: string; latest?: SlackMessage | null }>> {
+    // Use userToken to list the user's DMs (bot token only sees its own DMs).
+    const token = this.userToken ?? this.botToken;
     const result = await this.request<{
       channels: Array<{
         id: string;
         user: string;
         latest?: { ts: string; text: string; user?: string; thread_ts?: string } | null;
       }>;
-    }>("conversations.list", { types: "im", limit, exclude_archived: true });
+    }>("conversations.list", { types: "im", limit, exclude_archived: true }, { token });
 
     return result.channels.map((dm) => ({
       id: dm.id,
