@@ -79,6 +79,17 @@ const COMPLEX_KEYWORDS = [
   "schedule",
   "monitor",
   "restart",
+  "check",
+  "read",
+  "review",
+  "summarize",
+  "show",
+  "list",
+  "look",
+  "inspect",
+  "verify",
+  "scan",
+  "open",
 ];
 
 /** Patterns that indicate complex content. */
