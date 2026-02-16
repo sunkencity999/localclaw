@@ -270,33 +270,55 @@ async function promptOrchestratorConfig(
     };
   }
 
-  // Pick the orchestrator (API) model from catalog or manual entry
+  // Pick the orchestrator (API) model — curated popular models + catalog API models.
   let orchModel = currentModel;
+
+  const WELL_KNOWN_ORCHESTRATOR_MODELS: Array<{ value: string; hint: string }> = [
+    { value: "anthropic/claude-sonnet-4", hint: "200K ctx, fast + capable" },
+    { value: "anthropic/claude-opus-4", hint: "200K ctx, most capable" },
+    { value: "openai/gpt-4.1", hint: "1M ctx, strong reasoning" },
+    { value: "openai/gpt-4.1-mini", hint: "1M ctx, fast + affordable" },
+    { value: "openai/o4-mini", hint: "200K ctx, reasoning model" },
+    { value: "google/gemini-2.5-pro", hint: "1M ctx, multimodal" },
+    { value: "google/gemini-2.5-flash", hint: "1M ctx, fast + affordable" },
+    { value: "openrouter/auto", hint: "OpenRouter auto-routing" },
+  ];
+
+  // Merge catalog API models (deduplicated against well-known list)
   const catalog = await loadModelCatalog({ config: nextConfig, useCache: false });
   const apiModels = catalog.filter(
     (e) => !LOCAL_MODEL_PROVIDERS.includes(e.provider as (typeof LOCAL_MODEL_PROVIDERS)[number]),
   );
+  const wellKnownKeys = new Set(WELL_KNOWN_ORCHESTRATOR_MODELS.map((m) => m.value));
+  const extraCatalogOptions = apiModels
+    .filter((m) => !wellKnownKeys.has(`${m.provider}/${m.name}`))
+    .slice(0, 15)
+    .map((m) => ({
+      value: `${m.provider}/${m.name}`,
+      label: `${m.provider}/${m.name}`,
+      hint: m.contextWindow ? `${Math.round(m.contextWindow / 1024)}K ctx` : undefined,
+    }));
 
-  if (apiModels.length > 0) {
-    const options = [
-      { value: "__manual__", label: "Enter manually" },
-      ...apiModels.slice(0, 30).map((m) => ({
-        value: `${m.provider}/${m.name}`,
-        label: `${m.provider}/${m.name}`,
-        hint: m.contextWindow ? `${Math.round(m.contextWindow / 1024)}K ctx` : undefined,
-      })),
-    ];
-    const selected = guardCancel(
-      await prompter.select({
-        message: "Orchestrator model (powerful API model for complex tasks)",
-        options,
-        initialValue: currentModel || options[1]?.value,
-      }),
-      runtime,
-    );
-    if (selected !== "__manual__") {
-      orchModel = selected;
-    }
+  const options = [
+    ...WELL_KNOWN_ORCHESTRATOR_MODELS.map((m) => ({
+      value: m.value,
+      label: m.value,
+      hint: m.hint,
+    })),
+    ...extraCatalogOptions,
+    { value: "__manual__", label: "Enter manually", hint: "Type provider/model" },
+  ];
+
+  const selected = guardCancel(
+    await prompter.select({
+      message: "Orchestrator model (powerful API model for complex tasks)",
+      options,
+      initialValue: currentModel || options[0]?.value,
+    }),
+    runtime,
+  );
+  if (selected !== "__manual__") {
+    orchModel = selected;
   }
 
   if (!orchModel || orchModel === "__manual__") {
