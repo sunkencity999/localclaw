@@ -486,10 +486,16 @@ export async function runTui(opts: TuiOptions) {
     const reasoning = sessionInfo.reasoningLevel ?? "off";
     const reasoningLabel =
       reasoning === "on" ? "reasoning" : reasoning === "stream" ? "reasoning:stream" : null;
+    const orchCfg = config.agents?.defaults?.orchestrator;
+    const orchLabel =
+      orchCfg?.enabled && orchCfg.model
+        ? `orch: ${orchCfg.model} (${orchCfg.strategy ?? "auto"})`
+        : null;
     const footerParts = [
       `agent ${agentLabel}`,
       `session ${sessionLabel}`,
       modelLabel,
+      orchLabel,
       think !== "off" ? `think ${think}` : null,
       verbose !== "off" ? `verbose ${verbose}` : null,
       reasoningLabel,
