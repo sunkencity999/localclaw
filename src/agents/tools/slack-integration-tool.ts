@@ -52,8 +52,8 @@ export function createSlackIntegrationTool(options?: {
       "Slack workspace integration.",
       "To find/read DMs with a SPECIFIC PERSON: use action=list_dms with query=their_username",
       "(e.g. query='ryan.valencia'). This searches the entire workspace and returns their DM",
-      "messages directly — even if the DM is old. Without query, list_dms shows the 20 most",
-      "recent DMs only. read_dm also works for this (same result).",
+      "messages directly — even if the DM is old. Without query, list_dms shows the 50 most",
+      "recent DMs (limit up to 200). read_dm also works for this (same result).",
       "Other: post_message, channel_history, thread_replies, search_messages, list_channels,",
       "lookup_user, find_user, open_dm, add_reaction, set_topic.",
     ].join(" "),
@@ -103,7 +103,7 @@ async function executeSlackAction(
     case "channel_history": {
       const channel = readStringParam(params, "channel", { required: true });
       const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
-      const messages = await client.getChannelHistory(channel, Math.max(1, Math.min(100, limit)));
+      const messages = await client.getChannelHistory(channel, Math.max(1, Math.min(200, limit)));
       const text =
         messages.length > 0
           ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
@@ -168,7 +168,7 @@ async function executeSlackAction(
 
     case "list_dms": {
       const query = readStringParam(params, "query");
-      const limit = readNumberParam(params, "limit", { integer: true }) ?? (query ? 10 : 20);
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? (query ? 10 : 50);
 
       // If query is provided, use fast search to find that specific person's DM.
       if (query) {
@@ -207,7 +207,7 @@ async function executeSlackAction(
       }
 
       // No query — list recent DMs.
-      const dms = await client.listDMs(Math.max(1, Math.min(50, limit)));
+      const dms = await client.listDMs(Math.max(1, Math.min(200, limit)));
       if (dms.length === 0) {
         return {
           content: [{ type: "text", text: "No DM conversations found." }],
