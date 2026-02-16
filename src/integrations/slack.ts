@@ -171,6 +171,35 @@ export class SlackClient {
     }));
   }
 
+  private channelNameCache: Map<string, string> | null = null;
+
+  async resolveChannelId(channelOrName: string): Promise<string> {
+    const trimmed = channelOrName.trim();
+    if (/^[CGD][A-Z0-9]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+    const name = trimmed.replace(/^#/, "").toLowerCase();
+    if (!name) {
+      return trimmed;
+    }
+    if (this.channelNameCache) {
+      const cached = this.channelNameCache.get(name);
+      if (cached) {
+        return cached;
+      }
+    }
+    const channels = await this.listChannels(1000);
+    this.channelNameCache = new Map();
+    for (const ch of channels) {
+      this.channelNameCache.set(ch.name.toLowerCase(), ch.id);
+    }
+    const resolved = this.channelNameCache.get(name);
+    if (resolved) {
+      return resolved;
+    }
+    return trimmed;
+  }
+
   async listChannels(limit = 100): Promise<SlackChannel[]> {
     const result = await this.request<{
       channels: Array<{

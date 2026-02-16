@@ -87,10 +87,11 @@ async function executeSlackAction(
   switch (action) {
     case "post_message": {
       const text = readStringParam(params, "text", { required: true });
-      const channel = readStringParam(params, "channel");
+      const rawChannel = readStringParam(params, "channel");
+      const channel = rawChannel ? await client.resolveChannelId(rawChannel) : "";
       const threadTs = readStringParam(params, "threadTs");
       const result = await client.postMessage({
-        channel: channel ?? "",
+        channel,
         text,
         threadTs,
       });
@@ -133,7 +134,8 @@ async function executeSlackAction(
     }
 
     case "channel_history": {
-      const channel = readStringParam(params, "channel", { required: true });
+      const rawCh = readStringParam(params, "channel", { required: true });
+      const channel = await client.resolveChannelId(rawCh);
       const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
       const messages = await client.getChannelHistory(channel, Math.max(1, Math.min(200, limit)));
       const text =
@@ -147,7 +149,8 @@ async function executeSlackAction(
     }
 
     case "thread_replies": {
-      const channel = readStringParam(params, "channel", { required: true });
+      const rawThCh = readStringParam(params, "channel", { required: true });
+      const channel = await client.resolveChannelId(rawThCh);
       const threadTs = readStringParam(params, "threadTs", { required: true });
       const messages = await client.getThreadReplies(channel, threadTs);
       const text =
@@ -398,7 +401,8 @@ async function executeSlackAction(
     }
 
     case "add_reaction": {
-      const channel = readStringParam(params, "channel", { required: true });
+      const rawReactCh = readStringParam(params, "channel", { required: true });
+      const channel = await client.resolveChannelId(rawReactCh);
       const timestamp = readStringParam(params, "timestamp", { required: true });
       const emoji = readStringParam(params, "emoji", { required: true });
       await client.addReaction(channel, timestamp, emoji.replace(/^:|:$/g, ""));
@@ -409,7 +413,8 @@ async function executeSlackAction(
     }
 
     case "set_topic": {
-      const channel = readStringParam(params, "channel", { required: true });
+      const rawTopicCh = readStringParam(params, "channel", { required: true });
+      const channel = await client.resolveChannelId(rawTopicCh);
       const topic = readStringParam(params, "topic", { required: true });
       await client.setChannelTopic(channel, topic);
       return {
