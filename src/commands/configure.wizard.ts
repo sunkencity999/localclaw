@@ -274,6 +274,12 @@ async function promptOrchestratorConfig(
   let orchModel = currentModel;
 
   const WELL_KNOWN_ORCHESTRATOR_MODELS: Array<{ value: string; hint: string }> = [
+    { value: "openai-codex/gpt-5.3-codex", hint: "most capable agentic coding model" },
+    { value: "openai-codex/gpt-5.2-codex", hint: "advanced coding, real-world engineering" },
+    { value: "openai-codex/gpt-5.1-codex-max", hint: "long-horizon agentic coding" },
+    { value: "openai-codex/gpt-5.1-codex", hint: "long-running agentic coding" },
+    { value: "openai/gpt-5.2", hint: "best general agentic model" },
+    { value: "openai/gpt-5.1", hint: "coding + agentic tasks" },
     { value: "anthropic/claude-sonnet-4", hint: "200K ctx, fast + capable" },
     { value: "anthropic/claude-opus-4", hint: "200K ctx, most capable" },
     { value: "openai/gpt-4.1", hint: "1M ctx, strong reasoning" },
