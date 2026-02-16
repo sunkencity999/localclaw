@@ -9,6 +9,7 @@ const SLACK_INTEGRATION_ACTIONS = [
   "post_message",
   "channel_history",
   "thread_replies",
+  "read_dm",
   "list_dms",
   "find_user",
   "open_dm",
@@ -49,13 +50,11 @@ export function createSlackIntegrationTool(options?: {
     name: "slack_integration",
     description: [
       "Slack integration for posting messages, reading channels, DMs, and searching.",
-      "Actions: post_message, channel_history, thread_replies, list_dms, find_user, open_dm,",
+      "IMPORTANT: To read DMs with a specific person, use read_dm with query set to their",
+      "name or username (e.g. query='ryan.valencia'). This finds the user, opens the DM,",
+      "and returns messages in a single call. Use list_dms to see recent DM conversations.",
+      "Other actions: post_message, channel_history, thread_replies, find_user, open_dm,",
       "search_messages, list_channels, lookup_user, add_reaction, set_topic.",
-      "To read a specific person's DMs: 1) find_user with their name to get their user ID,",
-      "2) open_dm with that user ID to get the DM channel ID,",
-      "3) channel_history with that channel ID to read messages.",
-      "list_dms shows recent DM conversations with resolved names.",
-      "The bot must be invited to a channel (/invite @bot) before it can read channel history.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
     execute: async (_toolCallId, args) => {
@@ -125,6 +124,44 @@ async function executeSlackAction(
       return {
         content: [{ type: "text", text }],
         details: { channel, threadTs, count: messages.length, messages },
+      };
+    }
+
+    case "read_dm": {
+      const query = readStringParam(params, "query", { required: true });
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? 10;
+      // All-in-one: find user → open DM → read history.
+      const users = await client.findUsers(query, 1);
+      if (users.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No user found matching "${query}". Try a more specific username or name.`,
+            },
+          ],
+          details: { query, found: false },
+        };
+      }
+      const user = users[0];
+      const dm = await client.openDM(user.id);
+      const messages = await client.getChannelHistory(
+        dm.channelId,
+        Math.max(1, Math.min(50, limit)),
+      );
+      const header = `DM with ${user.realName ?? user.name} (${user.name}, ${user.id}), channel ${dm.channelId}`;
+      const body =
+        messages.length > 0
+          ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+          : "No messages in this conversation.";
+      return {
+        content: [{ type: "text", text: `${header}\n${messages.length} message(s):\n${body}` }],
+        details: {
+          user,
+          channelId: dm.channelId,
+          count: messages.length,
+          messages,
+        },
       };
     }
 
