@@ -531,6 +531,31 @@ export async function runReplyAgent(params: {
       finalPayloads = appendUsageLine(finalPayloads, responseUsageLine);
     }
 
+    // Warn non-technical users when context is getting full and responses may degrade.
+    if (hasNonzeroUsage(usage) && contextTokensUsed > 0) {
+      const inputTokens = usage.input ?? 0;
+      const contextPct = inputTokens / contextTokensUsed;
+      const isLocal = providerUsed === "ollama";
+      const warnThreshold = isLocal ? 0.5 : 0.75;
+      const criticalThreshold = isLocal ? 0.75 : 0.9;
+      const pctLabel = Math.round(contextPct * 100);
+      if (contextPct >= criticalThreshold) {
+        finalPayloads = [
+          ...finalPayloads,
+          {
+            text: `⚠️ Memory is ${pctLabel}% full — responses will be very slow or may fail. Please start a fresh conversation by typing /new`,
+          },
+        ];
+      } else if (contextPct >= warnThreshold) {
+        finalPayloads = [
+          ...finalPayloads,
+          {
+            text: `💡 Memory is ${pctLabel}% full — responses may start slowing down. Type /new to start a fresh conversation if needed.`,
+          },
+        ];
+      }
+    }
+
     return finalizeWithFollowup(
       finalPayloads.length === 1 ? finalPayloads[0] : finalPayloads,
       queueKey,
