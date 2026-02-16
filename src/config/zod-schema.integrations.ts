@@ -44,11 +44,32 @@ export const SlackIntegrationSchema = z
   .strict()
   .optional();
 
+export const EmailAccountSchema = z.object({
+  /** Gmail address (must be authenticated with gog) */
+  address: z.string(),
+  /** Human-friendly label for this account (e.g. "home", "work") */
+  label: z.string().optional(),
+});
+
+export const EmailIntegrationSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    /** List of Gmail accounts (each must be authenticated via `gog auth login`) */
+    accounts: z.array(EmailAccountSchema).optional(),
+    /** Default account address to use when none is specified */
+    defaultAccount: z.string().optional(),
+    /** Command timeout in seconds (default: 30) */
+    timeoutSeconds: z.number().int().positive().optional(),
+  })
+  .strict()
+  .optional();
+
 export const IntegrationsSchema = z
   .object({
     jira: JiraIntegrationSchema,
     confluence: ConfluenceIntegrationSchema,
     slack: SlackIntegrationSchema,
+    email: EmailIntegrationSchema,
   })
   .strict()
   .optional();

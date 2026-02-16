@@ -9,6 +9,7 @@ import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createConfluenceTool } from "./tools/confluence-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
+import { createEmailTool } from "./tools/email-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createGitTool } from "./tools/git-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
@@ -169,6 +170,8 @@ export function createOpenClawTools(options?: {
   if (confluenceTool) tools.push(confluenceTool);
   const slackIntegrationTool = createSlackIntegrationTool({ config: options?.config });
   if (slackIntegrationTool) tools.push(slackIntegrationTool);
+  const emailTool = createEmailTool({ config: options?.config });
+  if (emailTool) tools.push(emailTool);
 
   const pluginTools = resolvePluginTools({
     context: {
