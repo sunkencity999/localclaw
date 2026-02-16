@@ -802,6 +802,11 @@ export async function runConfigureWizard(
           await persistConfig();
         }
 
+        if (choice === "orchestrator") {
+          nextConfig = await promptOrchestratorConfig(nextConfig, runtime, prompter);
+          await persistConfig();
+        }
+
         if (choice === "daemon") {
           if (!didConfigureGateway) {
             const portInput = guardCancel(
