@@ -50,14 +50,12 @@ export function createSlackIntegrationTool(options?: {
     name: "slack_integration",
     description: [
       "Slack workspace integration.",
-      "RULE: When asked to find or read DMs with a SPECIFIC PERSON, you MUST use action=read_dm",
-      "with query set to their username (e.g. query='ryan.valencia' or query='john.smith').",
-      "read_dm finds the user, opens the DM, and returns messages in ONE call.",
-      "Do NOT use list_dms + channel_history to find a specific person — list_dms only shows",
-      "the 20 most recent DMs and will miss older conversations.",
-      "list_dms: browse recent DM conversations. channel_history: read a known channel.",
-      "Other: post_message, thread_replies, search_messages, list_channels, lookup_user,",
-      "find_user, open_dm, add_reaction, set_topic.",
+      "To find/read DMs with a SPECIFIC PERSON: use action=list_dms with query=their_username",
+      "(e.g. query='ryan.valencia'). This searches the entire workspace and returns their DM",
+      "messages directly — even if the DM is old. Without query, list_dms shows the 20 most",
+      "recent DMs only. read_dm also works for this (same result).",
+      "Other: post_message, channel_history, thread_replies, search_messages, list_channels,",
+      "lookup_user, find_user, open_dm, add_reaction, set_topic.",
     ].join(" "),
     parameters: SlackIntegrationToolSchema,
     execute: async (_toolCallId, args) => {
@@ -169,7 +167,46 @@ async function executeSlackAction(
     }
 
     case "list_dms": {
-      const limit = readNumberParam(params, "limit", { integer: true }) ?? 20;
+      const query = readStringParam(params, "query");
+      const limit = readNumberParam(params, "limit", { integer: true }) ?? (query ? 10 : 20);
+
+      // If query is provided, use fast search to find that specific person's DM.
+      if (query) {
+        const users = await client.findUsers(query, 1);
+        if (users.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No user found matching "${query}". Try a more specific username.`,
+              },
+            ],
+            details: { query, found: false },
+          };
+        }
+        const user = users[0];
+        const dm = await client.openDM(user.id);
+        const messages = await client.getChannelHistory(
+          dm.channelId,
+          Math.max(1, Math.min(50, limit)),
+        );
+        const header = `DM with ${user.realName ?? user.name} (@${user.name}), channel ${dm.channelId}`;
+        const body =
+          messages.length > 0
+            ? messages.map((m) => `[${m.ts}] ${m.user ?? "unknown"}: ${m.text}`).join("\n")
+            : "No messages in this conversation.";
+        return {
+          content: [{ type: "text", text: `${header}\n${messages.length} message(s):\n${body}` }],
+          details: {
+            user,
+            channelId: dm.channelId,
+            count: messages.length,
+            messages,
+          },
+        };
+      }
+
+      // No query — list recent DMs.
       const dms = await client.listDMs(Math.max(1, Math.min(50, limit)));
       if (dms.length === 0) {
         return {
@@ -184,8 +221,7 @@ async function executeSlackAction(
         lines.push(`${dm.id} — ${name} (${dm.userName ?? dm.user})${preview}`);
       }
       const hint =
-        "\n\nNOTE: This only shows the most recent DMs. To find a specific person's DMs " +
-        "(even older ones), use action=read_dm with query=their_username instead.";
+        "\nTip: To find a specific person's DMs, use list_dms with query=their_username.";
       return {
         content: [
           { type: "text", text: `${dms.length} DM conversation(s):\n${lines.join("\n")}${hint}` },
