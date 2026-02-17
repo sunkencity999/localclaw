@@ -1,5 +1,7 @@
 import type { Server } from "node:http";
+import type { Duplex } from "node:stream";
 import express from "express";
+import { connect as netConnect } from "node:net";
 import type { BrowserRouteRegistrar } from "./routes/types.js";
 import { loadConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -61,6 +63,65 @@ export async function startBrowserControlServerFromConfig(): Promise<BrowserServ
     await ensureChromeExtensionRelayServer({ cdpUrl: profile.cdpUrl }).catch((err) => {
       logServer.warn(`Chrome extension relay init failed for profile "${name}": ${String(err)}`);
     });
+  }
+
+  // Forward /extension WebSocket upgrades from the browser control port to
+  // the extension relay server.  The Chrome extension defaults to port 18792
+  // which only matches the relay port for gateway=18789.  This proxy ensures
+  // the extension can connect via the browser control port regardless of the
+  // gateway port configuration (e.g. LocalClaw on 18790).
+  for (const name of Object.keys(resolved.profiles)) {
+    const profile = resolveProfile(resolved, name);
+    if (!profile || profile.driver !== "extension") {
+      continue;
+    }
+    const relayPort = profile.cdpPort;
+    if (relayPort === port) {
+      break;
+    }
+    server.on(
+      "upgrade",
+      (
+        req: { url?: string; method?: string; httpVersion: string; rawHeaders: string[] },
+        socket: Duplex,
+        head: Buffer,
+      ) => {
+        const pathname = (req.url ?? "/").split("?")[0];
+        if (pathname !== "/extension") {
+          return;
+        }
+        const upstream = netConnect({ host: "127.0.0.1", port: relayPort }, () => {
+          let raw = `${req.method ?? "GET"} /extension HTTP/${req.httpVersion}\r\n`;
+          for (let i = 0; i < req.rawHeaders.length; i += 2) {
+            const key = req.rawHeaders[i];
+            const val = req.rawHeaders[i + 1];
+            raw +=
+              key?.toLowerCase() === "host"
+                ? `Host: 127.0.0.1:${relayPort}\r\n`
+                : `${key}: ${val}\r\n`;
+          }
+          raw += "\r\n";
+          upstream.write(raw);
+          if (head.length > 0) {
+            upstream.write(head);
+          }
+          upstream.pipe(socket);
+          socket.pipe(upstream);
+        });
+        upstream.on("error", () => {
+          try {
+            socket.destroy();
+          } catch {}
+        });
+        socket.on("error", () => {
+          try {
+            upstream.destroy();
+          } catch {}
+        });
+      },
+    );
+    logServer.info(`Extension WebSocket proxy: :${port}/extension → :${relayPort}/extension`);
+    break;
   }
 
   logServer.info(`Browser control listening on http://127.0.0.1:${port}/`);

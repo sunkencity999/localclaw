@@ -49,12 +49,35 @@ function setBadge(tabId, kind) {
   void chrome.action.setBadgeTextColor({ tabId, color: '#FFFFFF' }).catch(() => {})
 }
 
+/**
+ * Discover the actual relay port by probing /extension/status on candidate
+ * ports.  The relay is the only server that exposes this endpoint, so it
+ * reliably identifies the correct port even when the browser control server
+ * lives on the configured default (e.g. LocalClaw gateway offset).
+ */
+async function findRelayPort(basePort) {
+  const candidates = [basePort, basePort + 1, basePort - 1]
+  for (const port of candidates) {
+    if (port <= 0 || port > 65535) continue
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/extension/status`, {
+        signal: AbortSignal.timeout(800),
+      })
+      if (res.ok) return port
+    } catch {
+      continue
+    }
+  }
+  return basePort
+}
+
 async function ensureRelayConnection() {
   if (relayWs && relayWs.readyState === WebSocket.OPEN) return
   if (relayConnectPromise) return await relayConnectPromise
 
   relayConnectPromise = (async () => {
-    const port = await getRelayPort()
+    const basePort = await getRelayPort()
+    const port = await findRelayPort(basePort)
     const httpBase = `http://127.0.0.1:${port}`
     const wsUrl = `ws://127.0.0.1:${port}/extension`
 
