@@ -44,9 +44,20 @@ Common commands
 - Gmail send draft: `gog gmail drafts send <draftId>`
 - Gmail reply: `gog gmail send --to a@b.com --subject "Re: Hi" --body "Reply" --reply-to-message-id <msgId>`
 - Calendar list events: `gog calendar events <calendarId> --from <iso> --to <iso>`
+- Calendar search events: `gog calendar search "query" --max 10`
+- Calendar get event: `gog calendar event <calendarId> <eventId>`
 - Calendar create event: `gog calendar create <calendarId> --summary "Title" --from <iso> --to <iso>`
+- Calendar create with extras: `--description "..." --location "..." --attendees "a@x.com,b@x.com" --with-meet --all-day`
+- Calendar create with recurrence: `--rrule "RRULE:FREQ=WEEKLY;BYDAY=MO"`
+- Calendar create with reminders: `--reminder "popup:15m" --reminder "email:1d"`
 - Calendar create with color: `gog calendar create <calendarId> --summary "Title" --from <iso> --to <iso> --event-color 7`
 - Calendar update event: `gog calendar update <calendarId> <eventId> --summary "New Title" --event-color 4`
+- Calendar update recurring: `--scope single|future|all --original-start <iso>`
+- Calendar add attendees (preserve existing): `gog calendar update <calendarId> <eventId> --add-attendee "new@x.com"`
+- Calendar delete event: `gog calendar delete <calendarId> <eventId> --force`
+- Calendar focus time: `gog calendar focus-time --from <iso> --to <iso>`
+- Calendar out of office: `gog calendar out-of-office --from <iso> --to <iso>`
+- Calendar working location: `gog calendar working-location --from <iso> --to <iso> --type home|office|custom`
 - Calendar show colors: `gog calendar colors`
 - Drive search: `gog drive search "query" --max 10`
 - Contacts: `gog contacts list --max 20`
