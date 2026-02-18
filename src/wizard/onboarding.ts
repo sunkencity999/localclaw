@@ -47,34 +47,55 @@ import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 async function requireRiskAcknowledgement(params: {
   opts: OnboardOptions;
   prompter: WizardPrompter;
+  flow: WizardFlow;
 }) {
   if (params.opts.acceptRisk === true) {
     return;
   }
 
+  const quickstartMessage = [
+    "Security warning — please read.",
+    "",
+    "Beginner mode sets safer local defaults (loopback + local gateway), but this is still powerful software.",
+    "A bad prompt can still trick tools into unsafe actions if broad access is enabled.",
+    "",
+    "Recommended baseline:",
+    "- Keep the gateway local unless you intentionally need remote access.",
+    "- Keep tools least-privilege; only enable what you use.",
+    "- Keep secrets outside the agent-reachable filesystem.",
+    "",
+    "Run regularly:",
+    formatCliCommand("openclaw security audit --deep"),
+    formatCliCommand("openclaw security audit --fix"),
+    "",
+    "Must read: https://docs.openclaw.ai/gateway/security",
+  ];
+
+  const advancedMessage = [
+    "Security warning — please read.",
+    "",
+    "OpenClaw is a hobby project and still in beta. Expect sharp edges.",
+    "This bot can read files and run actions if tools are enabled.",
+    "A bad prompt can trick it into doing unsafe things.",
+    "",
+    "If you’re not comfortable with basic security and access control, don’t run OpenClaw.",
+    "Ask someone experienced to help before enabling tools or exposing it to the internet.",
+    "",
+    "Recommended baseline:",
+    "- Pairing/allowlists + mention gating.",
+    "- Sandbox + least-privilege tools.",
+    "- Keep secrets out of the agent’s reachable filesystem.",
+    "- Use the strongest available model for any bot with tools or untrusted inboxes.",
+    "",
+    "Run regularly:",
+    formatCliCommand("openclaw security audit --deep"),
+    formatCliCommand("openclaw security audit --fix"),
+    "",
+    "Must read: https://docs.openclaw.ai/gateway/security",
+  ];
+
   await params.prompter.note(
-    [
-      "Security warning — please read.",
-      "",
-      "OpenClaw is a hobby project and still in beta. Expect sharp edges.",
-      "This bot can read files and run actions if tools are enabled.",
-      "A bad prompt can trick it into doing unsafe things.",
-      "",
-      "If you’re not comfortable with basic security and access control, don’t run OpenClaw.",
-      "Ask someone experienced to help before enabling tools or exposing it to the internet.",
-      "",
-      "Recommended baseline:",
-      "- Pairing/allowlists + mention gating.",
-      "- Sandbox + least-privilege tools.",
-      "- Keep secrets out of the agent’s reachable filesystem.",
-      "- Use the strongest available model for any bot with tools or untrusted inboxes.",
-      "",
-      "Run regularly:",
-      "openclaw security audit --deep",
-      "openclaw security audit --fix",
-      "",
-      "Must read: https://docs.openclaw.ai/gateway/security",
-    ].join("\n"),
+    (params.flow === "quickstart" ? quickstartMessage : advancedMessage).join("\n"),
     "Security",
   );
 
@@ -94,7 +115,6 @@ export async function runOnboardingWizard(
 ) {
   printWizardHeader(runtime);
   await prompter.intro("LocalClaw onboarding");
-  await requireRiskAcknowledgement({ opts, prompter });
 
   const snapshot = await readConfigFileSnapshot();
   let baseConfig: OpenClawConfig = snapshot.valid ? snapshot.config : {};
@@ -119,15 +139,20 @@ export async function runOnboardingWizard(
   }
 
   const quickstartHint = `Configure details later via ${formatCliCommand("openclaw configure")}.`;
-  const manualHint = "Configure port, network, Tailscale, and auth options.";
+  const manualHint = "Configure network, auth, and advanced gateway details now.";
   const explicitFlowRaw = opts.flow?.trim();
-  const normalizedExplicitFlow = explicitFlowRaw === "manual" ? "advanced" : explicitFlowRaw;
+  const normalizedExplicitFlow =
+    explicitFlowRaw === "manual"
+      ? "advanced"
+      : explicitFlowRaw === "beginner"
+        ? "quickstart"
+        : explicitFlowRaw;
   if (
     normalizedExplicitFlow &&
     normalizedExplicitFlow !== "quickstart" &&
     normalizedExplicitFlow !== "advanced"
   ) {
-    runtime.error("Invalid --flow (use quickstart, manual, or advanced).");
+    runtime.error("Invalid --flow (use quickstart, beginner, manual, or advanced).");
     runtime.exit(1);
     return;
   }
@@ -140,19 +165,21 @@ export async function runOnboardingWizard(
     (await prompter.select({
       message: "Onboarding mode",
       options: [
-        { value: "quickstart", label: "QuickStart", hint: quickstartHint },
-        { value: "advanced", label: "Manual", hint: manualHint },
+        { value: "quickstart", label: "Beginner (QuickStart)", hint: quickstartHint },
+        { value: "advanced", label: "Advanced (manual setup)", hint: manualHint },
       ],
       initialValue: "quickstart",
     }));
 
   if (opts.mode === "remote" && flow === "quickstart") {
     await prompter.note(
-      "QuickStart only supports local gateways. Switching to Manual mode.",
+      "Beginner QuickStart only supports local gateways. Switching to Advanced mode.",
       "QuickStart",
     );
     flow = "advanced";
   }
+
+  await requireRiskAcknowledgement({ opts, prompter, flow });
 
   if (snapshot.exists) {
     await prompter.note(summarizeExistingConfig(baseConfig), "Existing config detected");

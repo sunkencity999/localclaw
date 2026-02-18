@@ -16,6 +16,10 @@ import { formatTokenK } from "./models/shared.js";
 const KEEP_VALUE = "__keep__";
 const MANUAL_VALUE = "__manual__";
 const PROVIDER_FILTER_THRESHOLD = 30;
+const RECOVERY_RETRY_VALUE = "__retry_models__";
+const RECOVERY_MANUAL_VALUE = "__manual_model__";
+const RECOVERY_KEEP_VALUE = "__keep_current_model__";
+const RECOVERY_ALL_VALUE = "__all_models__";
 
 export const LOCAL_MODEL_PROVIDERS = ["ollama", "lmstudio", "vllm"] as const;
 
@@ -154,6 +158,89 @@ async function promptManualModel(params: {
   return { model };
 }
 
+function isLocalOnlyProviderFilter(filterProviders: Set<string>): boolean {
+  if (filterProviders.size === 0) {
+    return false;
+  }
+  return Array.from(filterProviders).every((provider) => isLocalModelProvider(provider));
+}
+
+async function promptNoModelsRecovery(params: {
+  prompter: WizardPrompter;
+  localOnly: boolean;
+  allowKeep: boolean;
+  allowUseAll: boolean;
+  configuredModel?: string;
+}): Promise<"retry" | "manual" | "keep" | "all"> {
+  if (params.localOnly) {
+    await params.prompter.note(
+      [
+        "No local models detected yet.",
+        "",
+        "Quick checks:",
+        "- Ollama: make sure Ollama is running, then run `ollama list`.",
+        "- LM Studio: start the local server in Developer mode.",
+        "- vLLM: start an OpenAI-compatible server on localhost.",
+        "",
+        "After starting a local model server, choose Retry detection.",
+      ].join("\n"),
+      "Local models",
+    );
+  } else {
+    await params.prompter.note(
+      [
+        "No models were detected for the current selection.",
+        "You can retry detection now or enter a model manually.",
+      ].join("\n"),
+      "Model detection",
+    );
+  }
+
+  const options: WizardSelectOption[] = [
+    {
+      value: RECOVERY_RETRY_VALUE,
+      label: "Retry detection",
+      hint: "Re-scan configured model providers",
+    },
+  ];
+
+  if (params.allowUseAll) {
+    options.push({
+      value: RECOVERY_ALL_VALUE,
+      label: "Use all detected models",
+      hint: "Skip local-only filter for now",
+    });
+  }
+
+  options.push({ value: RECOVERY_MANUAL_VALUE, label: "Enter model manually" });
+
+  if (params.allowKeep) {
+    options.push({
+      value: RECOVERY_KEEP_VALUE,
+      label: params.configuredModel
+        ? `Keep current (${params.configuredModel})`
+        : "Keep current model",
+    });
+  }
+
+  const action = await params.prompter.select({
+    message: "No models found",
+    options,
+    initialValue: RECOVERY_RETRY_VALUE,
+  });
+
+  if (action === RECOVERY_RETRY_VALUE) {
+    return "retry";
+  }
+  if (action === RECOVERY_ALL_VALUE) {
+    return "all";
+  }
+  if (action === RECOVERY_KEEP_VALUE) {
+    return "keep";
+  }
+  return "manual";
+}
+
 export async function promptDefaultModel(
   params: PromptDefaultModelParams,
 ): Promise<PromptDefaultModelResult> {
@@ -177,184 +264,221 @@ export async function promptDefaultModel(
   const resolvedKey = modelKey(resolved.provider, resolved.model);
   const configuredKey = configuredRaw ? resolvedKey : "";
 
-  const catalog = params.catalog ?? (await loadModelCatalog({ config: cfg, useCache: false }));
-  if (catalog.length === 0) {
-    return promptManualModel({
-      prompter: params.prompter,
-      allowBlank: allowKeep,
-      initialValue: configuredRaw || resolvedKey || undefined,
-    });
-  }
+  let catalog = params.catalog ?? (await loadModelCatalog({ config: cfg, useCache: false }));
+  let allowAllProvidersFallback = false;
 
-  const aliasIndex = buildModelAliasIndex({
-    cfg,
-    defaultProvider: DEFAULT_PROVIDER,
-  });
-  let models = catalog;
-  if (!ignoreAllowlist) {
-    const { allowedCatalog } = buildAllowedModelSet({
+  while (true) {
+    if (catalog.length === 0) {
+      const action = await promptNoModelsRecovery({
+        prompter: params.prompter,
+        localOnly: isLocalOnlyProviderFilter(filterProviders),
+        allowKeep,
+        allowUseAll: false,
+        configuredModel: configuredRaw || resolvedKey || undefined,
+      });
+      if (action === "retry") {
+        catalog = await loadModelCatalog({ config: cfg, useCache: false });
+        continue;
+      }
+      if (action === "keep") {
+        return {};
+      }
+      return promptManualModel({
+        prompter: params.prompter,
+        allowBlank: allowKeep,
+        initialValue: configuredRaw || resolvedKey || undefined,
+      });
+    }
+
+    const aliasIndex = buildModelAliasIndex({
       cfg,
-      catalog,
       defaultProvider: DEFAULT_PROVIDER,
     });
-    models = allowedCatalog.length > 0 ? allowedCatalog : catalog;
-  }
+    let models = catalog;
+    if (!ignoreAllowlist) {
+      const { allowedCatalog } = buildAllowedModelSet({
+        cfg,
+        catalog,
+        defaultProvider: DEFAULT_PROVIDER,
+      });
+      models = allowedCatalog.length > 0 ? allowedCatalog : catalog;
+    }
 
-  if (filterProviders.size > 0) {
-    models = models.filter((entry) => filterProviders.has(normalizeProviderId(entry.provider)));
-  }
+    if (filterProviders.size > 0 && !allowAllProvidersFallback) {
+      models = models.filter((entry) => filterProviders.has(normalizeProviderId(entry.provider)));
+    }
 
-  if (models.length === 0) {
-    return promptManualModel({
-      prompter: params.prompter,
-      allowBlank: allowKeep,
-      initialValue: configuredRaw || resolvedKey || undefined,
+    if (models.length === 0) {
+      const action = await promptNoModelsRecovery({
+        prompter: params.prompter,
+        localOnly: isLocalOnlyProviderFilter(filterProviders),
+        allowKeep,
+        allowUseAll: filterProviders.size > 0 && !allowAllProvidersFallback,
+        configuredModel: configuredRaw || resolvedKey || undefined,
+      });
+      if (action === "retry") {
+        catalog = await loadModelCatalog({ config: cfg, useCache: false });
+        allowAllProvidersFallback = false;
+        continue;
+      }
+      if (action === "all") {
+        allowAllProvidersFallback = true;
+        continue;
+      }
+      if (action === "keep") {
+        return {};
+      }
+      return promptManualModel({
+        prompter: params.prompter,
+        allowBlank: allowKeep,
+        initialValue: configuredRaw || resolvedKey || undefined,
+      });
+    }
+
+    const providers = Array.from(new Set(models.map((entry) => entry.provider))).toSorted((a, b) =>
+      a.localeCompare(b),
+    );
+
+    const hasPreferredProvider = preferredProvider ? providers.includes(preferredProvider) : false;
+    const shouldPromptProvider =
+      !hasPreferredProvider && providers.length > 1 && models.length > PROVIDER_FILTER_THRESHOLD;
+    if (shouldPromptProvider) {
+      const selection = await params.prompter.select({
+        message: "Filter models by provider",
+        options: [
+          { value: "*", label: "All providers" },
+          ...providers.map((provider) => {
+            const count = models.filter((entry) => entry.provider === provider).length;
+            return {
+              value: provider,
+              label: provider,
+              hint: `${count} model${count === 1 ? "" : "s"}`,
+            };
+          }),
+        ],
+      });
+      if (selection !== "*") {
+        models = models.filter((entry) => entry.provider === selection);
+      }
+    }
+
+    if (hasPreferredProvider && preferredProvider) {
+      models = models.filter((entry) => entry.provider === preferredProvider);
+    }
+
+    const authStore = ensureAuthProfileStore(params.agentDir, {
+      allowKeychainPrompt: false,
     });
-  }
+    const authCache = new Map<string, boolean>();
+    const hasAuth = (provider: string) => {
+      const cached = authCache.get(provider);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const value = hasAuthForProvider(provider, cfg, authStore);
+      authCache.set(provider, value);
+      return value;
+    };
 
-  const providers = Array.from(new Set(models.map((entry) => entry.provider))).toSorted((a, b) =>
-    a.localeCompare(b),
-  );
+    const options: WizardSelectOption[] = [];
+    if (allowKeep) {
+      options.push({
+        value: KEEP_VALUE,
+        label: configuredRaw
+          ? `Keep current (${configuredRaw})`
+          : `Keep current (default: ${resolvedKey})`,
+        hint:
+          configuredRaw && configuredRaw !== resolvedKey ? `resolves to ${resolvedKey}` : undefined,
+      });
+    }
+    if (includeManual) {
+      options.push({ value: MANUAL_VALUE, label: "Enter model manually" });
+    }
 
-  const hasPreferredProvider = preferredProvider ? providers.includes(preferredProvider) : false;
-  const shouldPromptProvider =
-    !hasPreferredProvider && providers.length > 1 && models.length > PROVIDER_FILTER_THRESHOLD;
-  if (shouldPromptProvider) {
+    const seen = new Set<string>();
+    const addModelOption = (entry: {
+      provider: string;
+      id: string;
+      name?: string;
+      contextWindow?: number;
+      reasoning?: boolean;
+    }) => {
+      const key = modelKey(entry.provider, entry.id);
+      if (seen.has(key)) {
+        return;
+      }
+      // Skip internal router models that can't be directly called via API.
+      if (HIDDEN_ROUTER_MODELS.has(key)) {
+        return;
+      }
+      const hints: string[] = [];
+      if (entry.name && entry.name !== entry.id) {
+        hints.push(entry.name);
+      }
+      if (entry.contextWindow) {
+        hints.push(`ctx ${formatTokenK(entry.contextWindow)}`);
+      }
+      if (entry.reasoning) {
+        hints.push("reasoning");
+      }
+      const aliases = aliasIndex.byKey.get(key);
+      if (aliases?.length) {
+        hints.push(`alias: ${aliases.join(", ")}`);
+      }
+      if (!hasAuth(entry.provider)) {
+        hints.push("auth missing");
+      }
+      options.push({
+        value: key,
+        label: key,
+        hint: hints.length > 0 ? hints.join(" · ") : undefined,
+      });
+      seen.add(key);
+    };
+
+    for (const entry of models) {
+      addModelOption(entry);
+    }
+
+    if (configuredKey && !seen.has(configuredKey)) {
+      options.push({
+        value: configuredKey,
+        label: configuredKey,
+        hint: "current (not in catalog)",
+      });
+    }
+
+    let initialValue: string | undefined = allowKeep ? KEEP_VALUE : configuredKey || undefined;
+    if (
+      allowKeep &&
+      hasPreferredProvider &&
+      preferredProvider &&
+      resolved.provider !== preferredProvider
+    ) {
+      const firstModel = models[0];
+      if (firstModel) {
+        initialValue = modelKey(firstModel.provider, firstModel.id);
+      }
+    }
+
     const selection = await params.prompter.select({
-      message: "Filter models by provider",
-      options: [
-        { value: "*", label: "All providers" },
-        ...providers.map((provider) => {
-          const count = models.filter((entry) => entry.provider === provider).length;
-          return {
-            value: provider,
-            label: provider,
-            hint: `${count} model${count === 1 ? "" : "s"}`,
-          };
-        }),
-      ],
+      message: params.message ?? "Default model",
+      options,
+      initialValue,
     });
-    if (selection !== "*") {
-      models = models.filter((entry) => entry.provider === selection);
-    }
-  }
 
-  if (hasPreferredProvider && preferredProvider) {
-    models = models.filter((entry) => entry.provider === preferredProvider);
+    if (selection === KEEP_VALUE) {
+      return {};
+    }
+    if (selection === MANUAL_VALUE) {
+      return promptManualModel({
+        prompter: params.prompter,
+        allowBlank: false,
+        initialValue: configuredRaw || resolvedKey || undefined,
+      });
+    }
+    return { model: String(selection) };
   }
-
-  const authStore = ensureAuthProfileStore(params.agentDir, {
-    allowKeychainPrompt: false,
-  });
-  const authCache = new Map<string, boolean>();
-  const hasAuth = (provider: string) => {
-    const cached = authCache.get(provider);
-    if (cached !== undefined) {
-      return cached;
-    }
-    const value = hasAuthForProvider(provider, cfg, authStore);
-    authCache.set(provider, value);
-    return value;
-  };
-
-  const options: WizardSelectOption[] = [];
-  if (allowKeep) {
-    options.push({
-      value: KEEP_VALUE,
-      label: configuredRaw
-        ? `Keep current (${configuredRaw})`
-        : `Keep current (default: ${resolvedKey})`,
-      hint:
-        configuredRaw && configuredRaw !== resolvedKey ? `resolves to ${resolvedKey}` : undefined,
-    });
-  }
-  if (includeManual) {
-    options.push({ value: MANUAL_VALUE, label: "Enter model manually" });
-  }
-
-  const seen = new Set<string>();
-  const addModelOption = (entry: {
-    provider: string;
-    id: string;
-    name?: string;
-    contextWindow?: number;
-    reasoning?: boolean;
-  }) => {
-    const key = modelKey(entry.provider, entry.id);
-    if (seen.has(key)) {
-      return;
-    }
-    // Skip internal router models that can't be directly called via API.
-    if (HIDDEN_ROUTER_MODELS.has(key)) {
-      return;
-    }
-    const hints: string[] = [];
-    if (entry.name && entry.name !== entry.id) {
-      hints.push(entry.name);
-    }
-    if (entry.contextWindow) {
-      hints.push(`ctx ${formatTokenK(entry.contextWindow)}`);
-    }
-    if (entry.reasoning) {
-      hints.push("reasoning");
-    }
-    const aliases = aliasIndex.byKey.get(key);
-    if (aliases?.length) {
-      hints.push(`alias: ${aliases.join(", ")}`);
-    }
-    if (!hasAuth(entry.provider)) {
-      hints.push("auth missing");
-    }
-    options.push({
-      value: key,
-      label: key,
-      hint: hints.length > 0 ? hints.join(" · ") : undefined,
-    });
-    seen.add(key);
-  };
-
-  for (const entry of models) {
-    addModelOption(entry);
-  }
-
-  if (configuredKey && !seen.has(configuredKey)) {
-    options.push({
-      value: configuredKey,
-      label: configuredKey,
-      hint: "current (not in catalog)",
-    });
-  }
-
-  let initialValue: string | undefined = allowKeep ? KEEP_VALUE : configuredKey || undefined;
-  if (
-    allowKeep &&
-    hasPreferredProvider &&
-    preferredProvider &&
-    resolved.provider !== preferredProvider
-  ) {
-    const firstModel = models[0];
-    if (firstModel) {
-      initialValue = modelKey(firstModel.provider, firstModel.id);
-    }
-  }
-
-  const selection = await params.prompter.select({
-    message: params.message ?? "Default model",
-    options,
-    initialValue,
-  });
-
-  if (selection === KEEP_VALUE) {
-    return {};
-  }
-  if (selection === MANUAL_VALUE) {
-    return promptManualModel({
-      prompter: params.prompter,
-      allowBlank: false,
-      initialValue: configuredRaw || resolvedKey || undefined,
-    });
-  }
-  return { model: String(selection) };
 }
 
 export async function promptModelAllowlist(params: {

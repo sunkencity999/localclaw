@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import type { WizardPrompter } from "../wizard/prompts.js";
 import {
   applyModelAllowlist,
   applyModelFallbacksFromSelection,
@@ -37,6 +38,10 @@ vi.mock("../agents/model-auth.js", () => ({
   getCustomProviderApiKey,
 }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe("promptDefaultModel", () => {
   it("filters internal router models from the selection list", async () => {
     loadModelCatalog.mockResolvedValue([
@@ -56,7 +61,7 @@ describe("promptDefaultModel", () => {
       const first = params.options[0];
       return first?.value ?? "";
     });
-    const prompter = makePrompter({ select });
+    const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
     await promptDefaultModel({
@@ -73,6 +78,79 @@ describe("promptDefaultModel", () => {
     expect(
       options.some((opt: SelectOption) => opt.value === "openrouter/meta-llama/llama-3.3-70b:free"),
     ).toBe(true);
+  });
+
+  it("offers local-model recovery and retries detection", async () => {
+    loadModelCatalog.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        provider: "ollama",
+        id: "llama3.2:3b",
+        name: "Llama 3.2 3B",
+      },
+    ]);
+
+    const select = vi.fn(async (params: SelectParams) => {
+      if (params.message === "No models found") {
+        return "__retry_models__";
+      }
+      const modelOption = params.options.find((opt) => opt.value.includes("/"));
+      return modelOption?.value ?? "";
+    });
+
+    const note = vi.fn(async () => {});
+    const prompter = makePrompter({
+      select: select as unknown as WizardPrompter["select"],
+      note,
+    });
+    const config = { agents: { defaults: {} } } as OpenClawConfig;
+
+    const result = await promptDefaultModel({
+      config,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+      filterProviders: ["ollama", "lmstudio", "vllm"],
+    });
+
+    expect(result).toEqual({ model: "ollama/llama3.2:3b" });
+    expect(loadModelCatalog).toHaveBeenCalledTimes(2);
+    expect(note).toHaveBeenCalledWith(
+      expect.stringContaining("No local models detected yet."),
+      "Local models",
+    );
+  });
+
+  it("can fall back to all detected models when local-only filter is empty", async () => {
+    loadModelCatalog.mockResolvedValue([
+      {
+        provider: "anthropic",
+        id: "claude-opus-4-5",
+        name: "Claude Opus 4.5",
+      },
+    ]);
+
+    const select = vi.fn(async (params: SelectParams) => {
+      if (params.message === "No models found") {
+        return "__all_models__";
+      }
+      const modelOption = params.options.find((opt) => opt.value.includes("/"));
+      return modelOption?.value ?? "";
+    });
+
+    const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
+    const config = { agents: { defaults: {} } } as OpenClawConfig;
+
+    const result = await promptDefaultModel({
+      config,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+      filterProviders: ["ollama", "lmstudio", "vllm"],
+    });
+
+    expect(result).toEqual({ model: "anthropic/claude-opus-4-5" });
   });
 });
 
@@ -98,7 +176,7 @@ describe("promptDefaultModelWithLocalOptions", () => {
       const first = params.options[0];
       return first?.value ?? "";
     });
-    const prompter = makePrompter({ select });
+    const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
     await promptDefaultModelWithLocalOptions({
@@ -143,7 +221,7 @@ describe("promptDefaultModelWithLocalOptions", () => {
       const first = params.options[0];
       return first?.value ?? "";
     });
-    const prompter = makePrompter({ select });
+    const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
     await promptDefaultModelWithLocalOptions({
@@ -186,7 +264,9 @@ describe("promptModelAllowlist", () => {
     const multiselect = vi.fn(async (params: MultiSelectParams) =>
       params.options.map((option: { value: string }) => option.value),
     );
-    const prompter = makePrompter({ multiselect });
+    const prompter = makePrompter({
+      multiselect: multiselect as unknown as WizardPrompter["multiselect"],
+    });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
     await promptModelAllowlist({ config, prompter });
@@ -222,7 +302,9 @@ describe("promptModelAllowlist", () => {
     const multiselect = vi.fn(async (params: MultiSelectParams) =>
       params.options.map((option: { value: string }) => option.value),
     );
-    const prompter = makePrompter({ multiselect });
+    const prompter = makePrompter({
+      multiselect: multiselect as unknown as WizardPrompter["multiselect"],
+    });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
     await promptModelAllowlist({

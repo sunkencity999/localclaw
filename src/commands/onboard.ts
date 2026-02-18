@@ -34,7 +34,12 @@ export async function onboardCommand(opts: OnboardOptions, runtime: RuntimeEnv =
   if (authChoice === "codex-cli") {
     runtime.log('Auth choice "codex-cli" is deprecated; using OpenAI Codex OAuth instead.');
   }
-  const flow = opts.flow === "manual" ? ("advanced" as const) : opts.flow;
+  const flow =
+    opts.flow === "manual"
+      ? ("advanced" as const)
+      : opts.flow === "beginner"
+        ? ("quickstart" as const)
+        : opts.flow;
   const normalizedOpts =
     normalizedAuthChoice === opts.authChoice && flow === opts.flow
       ? opts
