@@ -25,7 +25,7 @@ const OLLAMA_KEEP_ALIVE = "24h";
  * If the model's default is below this threshold, we update the Modelfile
  * parameters via /api/create so all endpoints use the right context window.
  */
-const OLLAMA_MIN_NUM_CTX = 131_072;
+const OLLAMA_MIN_NUM_CTX = 32_768;
 
 /**
  * Pre-warm an Ollama model so the first real agent request is fast.
