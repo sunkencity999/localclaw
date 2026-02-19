@@ -17,6 +17,8 @@ import {
   resolveConfiguredModelRef,
 } from "../../agents/model-selection.js";
 
+export type MessageComplexity = "simple" | "moderate" | "complex";
+
 export type RoutingDecision = {
   /** Whether the message was routed to the fast model. */
   routed: boolean;
@@ -25,12 +27,32 @@ export type RoutingDecision = {
   /** The model to use. */
   model: string;
   /** Classification result. */
-  complexity: "simple" | "complex";
+  complexity: MessageComplexity;
   /** Why this classification was chosen (for logging). */
   reason: string;
 };
 
-/** Keywords that strongly suggest a complex/agentic task. */
+/**
+ * Keywords for single-action tool calls — the local primary model handles
+ * these fine.  They are too agentic for the tiny/fast model but don't need
+ * the power (or cost) of the API orchestrator.
+ */
+const MODERATE_KEYWORDS = [
+  "show",
+  "list",
+  "look",
+  "find",
+  "inspect",
+  "verify",
+  "scan",
+  "open",
+  "monitor",
+];
+
+/**
+ * Keywords that suggest multi-step reasoning, creative work, or complex
+ * agentic tasks — these benefit from a powerful API model.
+ */
 const COMPLEX_KEYWORDS = [
   "fix",
   "debug",
@@ -61,8 +83,6 @@ const COMPLEX_KEYWORDS = [
   "lint",
   "format",
   "analyze",
-  "search",
-  "find",
   "replace",
   "grep",
   "run",
@@ -72,24 +92,17 @@ const COMPLEX_KEYWORDS = [
   "scaffold",
   "convert",
   "parse",
-  "fetch",
-  "download",
-  "upload",
-  "send",
   "schedule",
-  "monitor",
   "restart",
+  "search",
   "check",
   "read",
   "review",
   "summarize",
-  "show",
-  "list",
-  "look",
-  "inspect",
-  "verify",
-  "scan",
-  "open",
+  "send",
+  "fetch",
+  "download",
+  "upload",
 ];
 
 /** Patterns that indicate complex content. */
@@ -108,10 +121,14 @@ const COMPLEX_PATTERNS = [
 const DEFAULT_MAX_SIMPLE_LENGTH = 150;
 
 /**
- * Classify a user message as simple or complex using heuristics.
+ * Classify a user message as simple, moderate, or complex using heuristics.
+ *
+ * - **simple**: greetings, short conversational messages → tiny/fast model
+ * - **moderate**: single-action tool calls (search, read, list, …) → local primary
+ * - **complex**: multi-step reasoning, creative work, code changes → API orchestrator
  */
 export function classifyMessageComplexity(message: string): {
-  complexity: "simple" | "complex";
+  complexity: MessageComplexity;
   reason: string;
 } {
   const trimmed = message.trim();
@@ -128,12 +145,20 @@ export function classifyMessageComplexity(message: string): {
     }
   }
 
-  // Check for complex keywords (word-boundary match)
+  // Check for complex keywords (word-boundary match) — multi-step reasoning
   const lowerMessage = trimmed.toLowerCase();
   for (const keyword of COMPLEX_KEYWORDS) {
     const regex = new RegExp(`\\b${keyword}\\b`, "i");
     if (regex.test(lowerMessage)) {
       return { complexity: "complex", reason: `contains keyword: ${keyword}` };
+    }
+  }
+
+  // Check for moderate keywords — single-action tool calls
+  for (const keyword of MODERATE_KEYWORDS) {
+    const regex = new RegExp(`\\b${keyword}\\b`, "i");
+    if (regex.test(lowerMessage)) {
+      return { complexity: "moderate", reason: `contains tool keyword: ${keyword}` };
     }
   }
 
@@ -202,7 +227,8 @@ export function resolveSmartRoute(params: {
 
   const { complexity, reason } = classifyMessageComplexity(trimmed);
 
-  if (complexity === "complex") {
+  // Only route "simple" to the fast model; moderate and complex stay on primary
+  if (complexity !== "simple") {
     return {
       routed: false,
       provider: params.currentProvider,

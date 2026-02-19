@@ -23,6 +23,26 @@ describe("classifyMessageComplexity", () => {
     expect(classifyMessageComplexity("run the tests").complexity).toBe("complex");
   });
 
+  it("classifies messages with moderate keywords as moderate", () => {
+    expect(classifyMessageComplexity("show me my calendar").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("list all files").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("find the config").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("look at that").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("inspect the element").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("open the dashboard").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("verify the status").complexity).toBe("moderate");
+  });
+
+  it("classifies external-leaning tool calls as complex", () => {
+    expect(classifyMessageComplexity("search my email").complexity).toBe("complex");
+    expect(classifyMessageComplexity("read the latest message").complexity).toBe("complex");
+    expect(classifyMessageComplexity("send a message to John").complexity).toBe("complex");
+    expect(classifyMessageComplexity("check my Jira issues").complexity).toBe("complex");
+    expect(classifyMessageComplexity("summarize that article").complexity).toBe("complex");
+    expect(classifyMessageComplexity("fetch the API data").complexity).toBe("complex");
+    expect(classifyMessageComplexity("download the report").complexity).toBe("complex");
+  });
+
   it("classifies messages with code blocks as complex", () => {
     expect(classifyMessageComplexity("```\nconst x = 1;\n```").complexity).toBe("complex");
   });
@@ -91,6 +111,19 @@ describe("resolveSmartRoute", () => {
     expect(result.routed).toBe(false);
     expect(result.model).toBe("glm-4.7-flash:latest");
     expect(result.complexity).toBe("complex");
+  });
+
+  it("does not route moderate messages to the fast model", () => {
+    const result = resolveSmartRoute({
+      message: "show me the status",
+      cfg: baseCfg as unknown as OpenClawConfig,
+      currentProvider: "ollama",
+      currentModel: "glm-4.7-flash:latest",
+      defaultProvider: "ollama",
+    });
+    expect(result.routed).toBe(false);
+    expect(result.model).toBe("glm-4.7-flash:latest");
+    expect(result.complexity).toBe("moderate");
   });
 
   it("does not route when routing is disabled", () => {
