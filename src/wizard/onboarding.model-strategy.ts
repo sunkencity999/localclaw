@@ -308,6 +308,9 @@ async function applyLocalStrategy(params: {
   // 5. Check if default Ollama models need to be pulled
   await ensureOllamaModels({ prompter, models: [primaryModel, fastModel] });
 
+  // 6. Ensure OLLAMA_FLASH_ATTENTION=1 is in the user's shell config
+  await ensureOllamaFlashAttention({ prompter });
+
   const lines = [`Primary model: ${primaryModel}`, `Fast model: ${fastModel}`];
   const orch = config.agents?.defaults?.orchestrator;
   if (orch?.enabled && orch.model) {
@@ -537,5 +540,64 @@ async function ensureOllamaModels(params: {
         "Download failed",
       );
     }
+  }
+}
+
+// ── Flash attention ─────────────────────────────────────────────────────────
+
+/**
+ * Check if OLLAMA_FLASH_ATTENTION=1 is set in the user's shell config.
+ * Flash attention reduces memory usage and improves throughput on supported
+ * hardware.  If it's missing, offer to add it.
+ */
+async function ensureOllamaFlashAttention(params: { prompter: WizardPrompter }): Promise<void> {
+  const { prompter } = params;
+
+  // Already active in the current environment — nothing to do.
+  if (process.env.OLLAMA_FLASH_ATTENTION === "1" || process.env.OLLAMA_FLASH_ATTENTION === "true") {
+    return;
+  }
+
+  // Determine shell config file.
+  const shell = process.env.SHELL ?? "";
+  const home = process.env.HOME;
+  if (!home) return;
+
+  const { existsSync, readFileSync, appendFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+
+  const rcFile = shell.endsWith("/zsh") ? join(home, ".zshrc") : join(home, ".bashrc");
+
+  // Check if already present in the file.
+  if (existsSync(rcFile)) {
+    const content = readFileSync(rcFile, "utf-8");
+    if (/OLLAMA_FLASH_ATTENTION\s*=/.test(content)) {
+      return;
+    }
+  }
+
+  const shouldAdd = await prompter.confirm({
+    message:
+      "Enable Ollama flash attention? (reduces memory usage, improves speed — adds OLLAMA_FLASH_ATTENTION=1 to " +
+      rcFile.replace(home, "~") +
+      ")",
+    initialValue: true,
+  });
+
+  if (!shouldAdd) return;
+
+  try {
+    const line = "\nexport OLLAMA_FLASH_ATTENTION=1\n";
+    appendFileSync(rcFile, line, "utf-8");
+    process.env.OLLAMA_FLASH_ATTENTION = "1";
+    await prompter.note(
+      `Added OLLAMA_FLASH_ATTENTION=1 to ${rcFile.replace(home, "~")}.\nRestart your terminal or run: source ${rcFile.replace(home, "~")}`,
+      "Flash attention enabled",
+    );
+  } catch (err) {
+    await prompter.note(
+      `Could not write to ${rcFile.replace(home, "~")}: ${err instanceof Error ? err.message : String(err)}\nAdd manually: export OLLAMA_FLASH_ATTENTION=1`,
+      "Manual setup needed",
+    );
   }
 }
