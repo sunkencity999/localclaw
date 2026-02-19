@@ -106,6 +106,64 @@ export function applyWizardMetadata(
   };
 }
 
+/** Well-known onboarding steps, in order. */
+export const ONBOARDING_STEPS = [
+  "auth",
+  "model-strategy",
+  "gateway",
+  "channels",
+  "workspace",
+  "skills",
+  "hooks",
+  "complete",
+] as const;
+
+export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+/** Save a checkpoint so a crashed wizard can resume from this step. */
+export function saveOnboardingCheckpoint(
+  cfg: OpenClawConfig,
+  step: OnboardingStep,
+  flow?: "quickstart" | "advanced",
+): OpenClawConfig {
+  return {
+    ...cfg,
+    wizard: {
+      ...cfg.wizard,
+      onboardingCheckpoint: {
+        step,
+        startedAt: cfg.wizard?.onboardingCheckpoint?.startedAt ?? new Date().toISOString(),
+        flow,
+      },
+    },
+  };
+}
+
+/** Clear the checkpoint on successful completion. */
+export function clearOnboardingCheckpoint(cfg: OpenClawConfig): OpenClawConfig {
+  if (!cfg.wizard?.onboardingCheckpoint) return cfg;
+  const { onboardingCheckpoint: _, ...rest } = cfg.wizard;
+  return { ...cfg, wizard: rest };
+}
+
+/** Read the current checkpoint from config (if any). */
+export function getOnboardingCheckpoint(
+  cfg: OpenClawConfig,
+): { step: OnboardingStep; startedAt: string; flow?: "quickstart" | "advanced" } | undefined {
+  const cp = cfg.wizard?.onboardingCheckpoint;
+  if (!cp?.step) return undefined;
+  // Validate step is known
+  if (!ONBOARDING_STEPS.includes(cp.step as OnboardingStep)) return undefined;
+  return { step: cp.step as OnboardingStep, startedAt: cp.startedAt, flow: cp.flow };
+}
+
+/** Check if a step is at or past the checkpoint (already done). */
+export function isStepCompleted(checkpoint: OnboardingStep, step: OnboardingStep): boolean {
+  const cpIdx = ONBOARDING_STEPS.indexOf(checkpoint);
+  const stepIdx = ONBOARDING_STEPS.indexOf(step);
+  return stepIdx < cpIdx;
+}
+
 type BrowserOpenSupport = {
   ok: boolean;
   reason?: string;

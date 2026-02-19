@@ -79,7 +79,20 @@ export async function promptModelStrategy(params: {
     initialValue: "balanced",
   });
 
-  const catalog = await loadModelCatalog({ config, useCache: false });
+  let catalog: ModelCatalogEntry[];
+  try {
+    catalog = await loadModelCatalog({ config, useCache: false });
+  } catch {
+    await prompter.note(
+      [
+        "Could not load the model catalog (Ollama may not be running).",
+        "Proceeding with defaults — you can reconfigure later via:",
+        "  localclaw configure --section models",
+      ].join("\n"),
+      "Catalog unavailable",
+    );
+    catalog = [];
+  }
 
   if (strategy === "all-api") {
     config = await applyAllApiStrategy({ config, prompter, catalog });

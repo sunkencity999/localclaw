@@ -58,6 +58,12 @@ export type OpenClawConfig = {
     lastRunCommit?: string;
     lastRunCommand?: string;
     lastRunMode?: "local" | "remote";
+    /** Tracks interrupted onboarding so the wizard can offer to resume. */
+    onboardingCheckpoint?: {
+      step: string;
+      startedAt: string;
+      flow?: "quickstart" | "advanced";
+    };
   };
   diagnostics?: DiagnosticsConfig;
   logging?: LoggingConfig;

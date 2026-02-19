@@ -57,6 +57,14 @@ export const OpenClawSchema = z
         lastRunCommit: z.string().optional(),
         lastRunCommand: z.string().optional(),
         lastRunMode: z.union([z.literal("local"), z.literal("remote")]).optional(),
+        onboardingCheckpoint: z
+          .object({
+            step: z.string(),
+            startedAt: z.string(),
+            flow: z.union([z.literal("quickstart"), z.literal("advanced")]).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

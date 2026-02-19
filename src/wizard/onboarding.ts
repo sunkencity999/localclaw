@@ -6,7 +6,11 @@ import type {
 } from "../commands/onboard-types.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
-import type { QuickstartGatewayDefaults, WizardFlow } from "./onboarding.types.js";
+import type {
+  GatewayWizardSettings,
+  QuickstartGatewayDefaults,
+  WizardFlow,
+} from "./onboarding.types.js";
 import { ensureAuthProfileStore } from "../agents/auth-profiles.js";
 import { listChannelPlugins } from "../channels/plugins/index.js";
 import { formatCliCommand } from "../cli/command-format.js";
@@ -21,11 +25,16 @@ import { applyPrimaryModel, promptDefaultModelWithLocalOptions } from "../comman
 import { setupChannels } from "../commands/onboard-channels.js";
 import {
   applyWizardMetadata,
+  clearOnboardingCheckpoint,
   DEFAULT_WORKSPACE,
   ensureWorkspaceAndSessions,
+  getOnboardingCheckpoint,
   handleReset,
+  isStepCompleted,
+  type OnboardingStep,
   printWizardHeader,
   probeGatewayReachable,
+  saveOnboardingCheckpoint,
   summarizeExistingConfig,
 } from "../commands/onboard-helpers.js";
 import { setupInternalHooks } from "../commands/onboard-hooks.js";
@@ -137,6 +146,46 @@ export async function runOnboardingWizard(
     );
     runtime.exit(1);
     return;
+  }
+
+  // ── Resume detection ────────────────────────────────────────────────────────
+  const existingCheckpoint = getOnboardingCheckpoint(baseConfig);
+  let resumeFrom: OnboardingStep | undefined;
+  if (existingCheckpoint) {
+    await prompter.note(
+      [
+        `A previous onboarding run was interrupted at the "${existingCheckpoint.step}" step`,
+        `(started ${existingCheckpoint.startedAt}).`,
+        "",
+        "Your progress up to that point has been saved.",
+      ].join("\n"),
+      "Interrupted onboarding detected",
+    );
+    const shouldResume = await prompter.confirm({
+      message: "Resume from where you left off?",
+      initialValue: true,
+    });
+    if (shouldResume) {
+      resumeFrom = existingCheckpoint.step;
+      if (existingCheckpoint.flow) {
+        opts = { ...opts, flow: existingCheckpoint.flow };
+      }
+    } else {
+      // Clear stale checkpoint so a fresh run starts clean
+      baseConfig = clearOnboardingCheckpoint(baseConfig);
+      await writeConfigFile(baseConfig);
+    }
+  }
+
+  /** Save config + checkpoint to disk so progress survives a crash. */
+  async function saveProgress(
+    config: OpenClawConfig,
+    step: OnboardingStep,
+    flow?: "quickstart" | "advanced",
+  ): Promise<OpenClawConfig> {
+    const updated = saveOnboardingCheckpoint(config, step, flow);
+    await writeConfigFile(updated);
+    return updated;
   }
 
   const quickstartHint = `Configure details later via ${formatCliCommand("openclaw configure")}.`;
@@ -395,58 +444,111 @@ export async function runOnboardingWizard(
     },
   };
 
-  const authStore = ensureAuthProfileStore(undefined, {
-    allowKeychainPrompt: false,
-  });
-  const authChoiceFromPrompt = opts.authChoice === undefined;
-  const authChoice =
-    opts.authChoice ??
-    (await promptAuthChoiceGrouped({
-      prompter,
-      store: authStore,
-      includeSkip: true,
-    }));
+  // ── Auth step ──────────────────────────────────────────────────────────────
+  const skipAuth = resumeFrom !== undefined && isStepCompleted(resumeFrom, "auth");
+  let authChoiceFromPrompt = opts.authChoice === undefined;
 
-  const authResult = await applyAuthChoice({
-    authChoice,
-    config: nextConfig,
-    prompter,
-    runtime,
-    setDefaultModel: true,
-    opts: {
-      tokenProvider: opts.tokenProvider,
-      token: opts.authChoice === "apiKey" && opts.token ? opts.token : undefined,
-    },
-  });
-  nextConfig = authResult.config;
+  if (!skipAuth) {
+    const authStore = ensureAuthProfileStore(undefined, {
+      allowKeychainPrompt: false,
+    });
+    const authChoice =
+      opts.authChoice ??
+      (await promptAuthChoiceGrouped({
+        prompter,
+        store: authStore,
+        includeSkip: true,
+      }));
 
-  // Three-tier model strategy preset (balanced / local-only / all-API).
-  // Replaces the old single-model picker with a guided strategy selection
-  // that configures fast model, primary model, and orchestrator in one step.
-  if (authChoiceFromPrompt) {
-    const strategyResult = await promptModelStrategy({
+    const authResult = await applyAuthChoice({
+      authChoice,
       config: nextConfig,
       prompter,
+      runtime,
+      setDefaultModel: true,
+      opts: {
+        tokenProvider: opts.tokenProvider,
+        token: opts.authChoice === "apiKey" && opts.token ? opts.token : undefined,
+      },
     });
-    nextConfig = strategyResult.config;
+    nextConfig = authResult.config;
+    nextConfig = await saveProgress(nextConfig, "model-strategy", flow);
+  } else {
+    authChoiceFromPrompt = false;
   }
 
-  await warnIfModelConfigLooksOff(nextConfig, prompter);
+  // ── Model strategy step ───────────────────────────────────────────────────
+  const skipModelStrategy =
+    resumeFrom !== undefined && isStepCompleted(resumeFrom, "model-strategy");
 
-  const gateway = await configureGatewayForOnboarding({
-    flow,
-    baseConfig,
-    nextConfig,
-    localPort,
-    quickstartGateway,
-    prompter,
-    runtime,
-  });
-  nextConfig = gateway.nextConfig;
-  const settings = gateway.settings;
+  if (!skipModelStrategy) {
+    // Three-tier model strategy preset (balanced / local-only / all-API).
+    // Replaces the old single-model picker with a guided strategy selection
+    // that configures fast model, primary model, and orchestrator in one step.
+    if (authChoiceFromPrompt) {
+      const strategyResult = await promptModelStrategy({
+        config: nextConfig,
+        prompter,
+      });
+      nextConfig = strategyResult.config;
+    }
 
-  if (opts.skipChannels ?? opts.skipProviders) {
-    await prompter.note("Skipping channel setup.", "Channels");
+    await warnIfModelConfigLooksOff(nextConfig, prompter);
+    nextConfig = await saveProgress(nextConfig, "gateway", flow);
+  }
+
+  // ── Gateway step ──────────────────────────────────────────────────────────
+  const skipGateway = resumeFrom !== undefined && isStepCompleted(resumeFrom, "gateway");
+  let settings: Awaited<ReturnType<typeof configureGatewayForOnboarding>>["settings"];
+
+  if (!skipGateway) {
+    const gateway = await configureGatewayForOnboarding({
+      flow,
+      baseConfig,
+      nextConfig,
+      localPort,
+      quickstartGateway,
+      prompter,
+      runtime,
+    });
+    nextConfig = gateway.nextConfig;
+    settings = gateway.settings;
+    nextConfig = await saveProgress(nextConfig, "channels", flow);
+  } else {
+    // On resume, derive settings from saved config without re-prompting
+    const gw = nextConfig.gateway;
+    const bindRaw = gw?.bind;
+    settings = {
+      port: gw?.port ?? localPort,
+      bind:
+        bindRaw === "loopback" ||
+        bindRaw === "lan" ||
+        bindRaw === "auto" ||
+        bindRaw === "custom" ||
+        bindRaw === "tailnet"
+          ? bindRaw
+          : "loopback",
+      customBindHost: gw?.customBindHost,
+      authMode: gw?.auth?.mode === "password" ? "password" : "token",
+      gatewayToken: gw?.auth?.token,
+      tailscaleMode:
+        gw?.tailscale?.mode === "serve" || gw?.tailscale?.mode === "funnel"
+          ? gw.tailscale.mode
+          : "off",
+      tailscaleResetOnExit: gw?.tailscale?.resetOnExit ?? false,
+    };
+  }
+
+  // ── Channels step ─────────────────────────────────────────────────────────
+  const skipChannels =
+    (resumeFrom !== undefined && isStepCompleted(resumeFrom, "channels")) ||
+    opts.skipChannels ||
+    opts.skipProviders;
+
+  if (skipChannels) {
+    if (!resumeFrom) {
+      await prompter.note("Skipping channel setup.", "Channels");
+    }
   } else {
     const quickstartAllowFromChannels =
       flow === "quickstart"
@@ -463,21 +565,36 @@ export async function runOnboardingWizard(
     });
   }
 
-  await writeConfigFile(nextConfig);
+  nextConfig = await saveProgress(nextConfig, "workspace", flow);
   logConfigUpdated(runtime);
+
+  // ── Workspace + skills step ───────────────────────────────────────────────
   await ensureWorkspaceAndSessions(workspaceDir, runtime, {
     skipBootstrap: Boolean(nextConfig.agents?.defaults?.skipBootstrap),
   });
 
-  if (opts.skipSkills) {
-    await prompter.note("Skipping skills setup.", "Skills");
+  const skipSkills =
+    (resumeFrom !== undefined && isStepCompleted(resumeFrom, "skills")) || opts.skipSkills;
+
+  if (skipSkills) {
+    if (!resumeFrom) {
+      await prompter.note("Skipping skills setup.", "Skills");
+    }
   } else {
     nextConfig = await setupSkills(nextConfig, workspaceDir, runtime, prompter);
   }
+  nextConfig = await saveProgress(nextConfig, "hooks", flow);
 
-  // Setup hooks (session memory on /new)
-  nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+  // ── Hooks step ────────────────────────────────────────────────────────────
+  const skipHooks = resumeFrom !== undefined && isStepCompleted(resumeFrom, "hooks");
 
+  if (!skipHooks) {
+    // Setup hooks (session memory on /new)
+    nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+  }
+
+  // ── Finalize: clear checkpoint and write final config ─────────────────────
+  nextConfig = clearOnboardingCheckpoint(nextConfig);
   nextConfig = applyWizardMetadata(nextConfig, { command: "onboard", mode });
   await writeConfigFile(nextConfig);
 
