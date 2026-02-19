@@ -333,8 +333,10 @@ export function createEmailTool(options?: { config?: OpenClawConfig }): AnyAgent
     description: [
       "Gmail integration for reading and sending email via gog CLI.",
       `Configured accounts: ${accountList}. Default: ${cfg.defaultAccount}.`,
-      "Actions: search (Gmail query syntax), read_message (by ID),",
-      "send (compose new), reply (to message/thread), list_labels, list_accounts.",
+      "Actions: search, read_message, send, reply, list_labels, list_accounts.",
+      "WORKFLOW: (1) search returns message summaries with IDs.",
+      "(2) Use read_message with a messageId from search results to get the FULL email content (subject, body, headers, attachments).",
+      "Always use read_message when the user asks to open, read, or view an email — search alone only returns summaries.",
       "Use the 'account' parameter to specify which account (by address or label).",
       "All operations run locally via the gog CLI — no cloud intermediary.",
     ].join(" "),
