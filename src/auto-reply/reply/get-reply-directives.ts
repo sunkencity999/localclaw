@@ -487,6 +487,13 @@ export async function resolveReplyDirectives(params: {
     if (orchRoute.routed) {
       provider = orchRoute.provider;
       model = orchRoute.model;
+    } else if (provider !== defaultProvider || model !== defaultModel) {
+      // Neither smart nor orchestrator routing claimed this message (moderate or
+      // simple-but-not-fast-routed).  Reset any sticky session model override back
+      // to the configured primary so moderate tasks don't stay on the expensive
+      // API model after a previous orchestrator escalation.
+      provider = defaultProvider;
+      model = defaultModel;
     }
   }
 
