@@ -396,50 +396,10 @@ export async function resolveReplyDirectives(params: {
   provider = modelState.provider;
   model = modelState.model;
 
-  // Smart routing: route simple queries to a fast model (unless user set /model)
-  let smartRouted = false;
-  if (!directives.hasModelDirective) {
-    const route = resolveSmartRoute({
-      message: cleanedBody,
-      cfg,
-      currentProvider: provider,
-      currentModel: model,
-      defaultProvider,
-    });
-    if (route.routed) {
-      provider = route.provider;
-      model = route.model;
-      smartRouted = true;
-    }
-  }
-
-  // Orchestrator routing: route complex tasks to a powerful API model (unless user set /model
-  // or smart routing already routed the message).
-  if (!directives.hasModelDirective && !smartRouted) {
-    const orchRoute = resolveOrchestratorRoute({
-      message: cleanedBody,
-      cfg,
-      currentProvider: provider,
-      currentModel: model,
-      defaultProvider,
-    });
-    if (orchRoute.routed) {
-      provider = orchRoute.provider;
-      model = orchRoute.model;
-    }
-  }
-
   let contextTokens = resolveContextTokens({
     agentCfg,
     model,
   });
-
-  // Cap context for fast-model routing so tiny models don't choke on huge session history.
-  if (smartRouted) {
-    const routing = cfg.agents?.defaults?.routing;
-    const fastCap = routing?.fastModelContextTokens ?? 4096;
-    contextTokens = Math.min(contextTokens, fastCap);
-  }
 
   const initialModelLabel = `${provider}/${model}`;
   const formatModelSwitchEvent = (label: string, alias?: string) =>
@@ -492,6 +452,49 @@ export async function resolveReplyDirectives(params: {
   model = applyResult.model;
   contextTokens = applyResult.contextTokens;
   const { directiveAck, perMessageQueueMode, perMessageQueueOptions } = applyResult;
+
+  // Smart routing: route simple queries to a fast local model.
+  // Applied AFTER directive overrides so session-level model overrides don't clobber
+  // the routing decision. Skipped when the current message has an explicit /model directive.
+  let smartRouted = false;
+  if (!directives.hasModelDirective) {
+    const route = resolveSmartRoute({
+      message: cleanedBody,
+      cfg,
+      currentProvider: provider,
+      currentModel: model,
+      defaultProvider,
+    });
+    if (route.routed) {
+      provider = route.provider;
+      model = route.model;
+      smartRouted = true;
+    }
+  }
+
+  // Orchestrator routing: route complex tasks to a powerful API model (unless user set
+  // /model or smart routing already routed the message).
+  if (!directives.hasModelDirective && !smartRouted) {
+    const orchRoute = resolveOrchestratorRoute({
+      message: cleanedBody,
+      cfg,
+      currentProvider: provider,
+      currentModel: model,
+      defaultProvider,
+    });
+    if (orchRoute.routed) {
+      provider = orchRoute.provider;
+      model = orchRoute.model;
+    }
+  }
+
+  // Cap context for fast-model routing so small models don't choke on huge session history.
+  if (smartRouted) {
+    const routing = cfg.agents?.defaults?.routing;
+    const fastCap = routing?.fastModelContextTokens ?? 4096;
+    contextTokens = Math.min(contextTokens, fastCap);
+  }
+
   const execOverrides = resolveExecOverrides({ directives, sessionEntry });
 
   return {
