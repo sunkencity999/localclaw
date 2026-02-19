@@ -54,6 +54,8 @@ export type ReplyDirectiveContinuation = {
   model: string;
   modelState: Awaited<ReturnType<typeof createModelSelectionState>>;
   contextTokens: number;
+  /** True when smart routing sent this message to the fast model (tools should be disabled). */
+  smartRouted: boolean;
   inlineStatusRequested: boolean;
   directiveAck?: ReplyPayload;
   perMessageQueueMode?: InlineDirectives["queueMode"];
@@ -523,6 +525,7 @@ export async function resolveReplyDirectives(params: {
       model,
       modelState,
       contextTokens,
+      smartRouted,
       inlineStatusRequested,
       directiveAck,
       perMessageQueueMode,

@@ -82,6 +82,8 @@ type RunPreparedReplyParams = {
   modelState: Awaited<ReturnType<typeof createModelSelectionState>>;
   provider: string;
   model: string;
+  /** True when smart routing sent this message to the fast model (tools disabled). */
+  smartRouted?: boolean;
   perMessageQueueMode?: InlineDirectives["queueMode"];
   perMessageQueueOptions?: {
     debounceMs?: number;
@@ -130,6 +132,7 @@ export async function runPreparedReply(
     modelState,
     provider,
     model,
+    smartRouted,
     perMessageQueueMode,
     perMessageQueueOptions,
     typing,
@@ -395,6 +398,7 @@ export async function runPreparedReply(
         defaultLevel: resolvedElevatedLevel ?? "off",
       },
       timeoutMs,
+      disableTools: smartRouted === true ? true : undefined,
       blockReplyBreak: resolvedBlockStreamingBreak,
       ownerNumbers: command.ownerList.length > 0 ? command.ownerList : undefined,
       extraSystemPrompt: extraSystemPrompt || undefined,

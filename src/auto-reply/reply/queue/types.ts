@@ -74,6 +74,8 @@ export type FollowupRun = {
       defaultLevel: ElevatedLevel;
     };
     timeoutMs: number;
+    /** Disable built-in tools for this run (e.g. fast-model routing for simple chat). */
+    disableTools?: boolean;
     blockReplyBreak: "text_end" | "message_end";
     ownerNumbers?: string[];
     extraSystemPrompt?: string;

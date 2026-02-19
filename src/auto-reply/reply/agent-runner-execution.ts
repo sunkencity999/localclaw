@@ -287,6 +287,7 @@ export async function runAgentTurnWithFallback(params: {
             agentDir: params.followupRun.run.agentDir,
             config: params.followupRun.run.config,
             skillsSnapshot: params.followupRun.run.skillsSnapshot,
+            disableTools: params.followupRun.run.disableTools,
             prompt: params.commandBody,
             extraSystemPrompt: params.followupRun.run.extraSystemPrompt,
             ownerNumbers: params.followupRun.run.ownerNumbers,
