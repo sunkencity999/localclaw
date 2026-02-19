@@ -10,8 +10,8 @@ import { isLocalModelProvider, LOCAL_MODEL_PROVIDERS } from "../commands/model-p
 
 const OLLAMA_API_BASE = "http://127.0.0.1:11434";
 
-/** Default tiny model for fast-tier routing (chat, greetings). */
-const DEFAULT_FAST_MODEL = "ollama/llama3.2:latest";
+/** Default fast model for fast-tier routing (chat, greetings). 7B-8B minimum recommended for quality. */
+const DEFAULT_FAST_MODEL = "ollama/llama3.1:8b";
 /** Default local primary model for moderate-tier (tool calls, lookups). */
 const DEFAULT_LOCAL_MODEL = "ollama/gemma3:12b";
 
@@ -48,9 +48,12 @@ export async function promptModelStrategy(params: {
     [
       "LocalClaw uses three tiers to route messages to the right model:",
       "",
-      "  Fast (tiny)   — greetings, yes/no → small local model (sub-second)",
-      "  Local (primary) — lookups, tool calls → capable local model",
-      "  API (complex)  — reasoning, code, external APIs → cloud API model",
+      "  Fast   — greetings, yes/no → 7B-8B local model (fast, good quality)",
+      "  Local  — lookups, tool calls → capable local model (12B+)",
+      "  API    — reasoning, code, external APIs → cloud API model",
+      "",
+      "Tip: We recommend at least 7B-8B for the fast tier. Smaller models",
+      "(1-3B) can feel robotic and miss context. You can still pick any size.",
       "",
       "Choose a strategy preset below. You can customize individual models afterward.",
     ].join("\n"),
@@ -217,7 +220,7 @@ async function applyLocalStrategy(params: {
   // 2. Pick fast model
   let fastModel: string | undefined;
   const useDefaultFast = await prompter.confirm({
-    message: `Use ${DEFAULT_FAST_MODEL} as fast model for chat?`,
+    message: `Use ${DEFAULT_FAST_MODEL} as fast model for chat? (7B-8B recommended minimum)`,
     initialValue: true,
   });
 

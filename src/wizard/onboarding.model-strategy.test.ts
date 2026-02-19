@@ -90,7 +90,7 @@ describe("promptModelStrategy", () => {
     expect(result.config.agents?.defaults?.model).toEqual({ primary: "ollama/gemma3:12b" });
     expect(result.config.agents?.defaults?.routing).toEqual({
       enabled: true,
-      fastModel: "ollama/llama3.2:latest",
+      fastModel: "ollama/llama3.1:8b",
       maxSimpleLength: 250,
     });
   });
@@ -159,6 +159,6 @@ describe("promptModelStrategy", () => {
     expect(result.strategy).toBe("local-only");
     // Should fall back to default models
     expect(result.config.agents?.defaults?.model).toEqual({ primary: "ollama/gemma3:12b" });
-    expect(result.config.agents?.defaults?.routing?.fastModel).toBe("ollama/llama3.2:latest");
+    expect(result.config.agents?.defaults?.routing?.fastModel).toBe("ollama/llama3.1:8b");
   });
 });
