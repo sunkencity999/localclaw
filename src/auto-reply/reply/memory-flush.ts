@@ -9,13 +9,27 @@ export const DEFAULT_MEMORY_FLUSH_SOFT_TOKENS = 4000;
 
 export const DEFAULT_MEMORY_FLUSH_PROMPT = [
   "Pre-compaction memory flush.",
-  "Store durable memories now (use memory/YYYY-MM-DD.md; create memory/ if needed).",
-  `If nothing to store, reply with ${SILENT_REPLY_TOKEN}.`,
-].join(" ");
+  "Persist durable memories now. Write TWO files (create memory/ if needed):",
+  "",
+  "1. **memory/YYYY-MM-DD.md** — append today's notable events, decisions, and conversation highlights as timestamped bullet points.",
+  "",
+  "2. **memory/state.md** — overwrite with a structured snapshot of the user's current situation. Use these sections:",
+  "   - **Active tasks**: what the user is working on right now",
+  "   - **Recent decisions**: key choices or outcomes from this session",
+  "   - **Pending items**: things the user asked about or needs to follow up on",
+  "   - **User context**: name, preferences, time of day awareness, and mood cues",
+  "   - **Environment**: relevant tools, services, or accounts in use",
+  "   Keep state.md under 600 words — it is injected into the fast model's context window.",
+  "",
+  `If nothing meaningful to store, reply with ${SILENT_REPLY_TOKEN}.`,
+].join("\n");
 
 export const DEFAULT_MEMORY_FLUSH_SYSTEM_PROMPT = [
   "Pre-compaction memory flush turn.",
   "The session is near auto-compaction; capture durable memories to disk.",
+  "IMPORTANT: Always update memory/state.md with a structured snapshot of the user's current situation, active tasks, and pending items.",
+  "This file is the primary context source for the fast local model which handles simple queries.",
+  "Also append notable events to memory/YYYY-MM-DD.md for long-term recall.",
   `You may reply, but usually ${SILENT_REPLY_TOKEN} is correct.`,
 ].join(" ");
 

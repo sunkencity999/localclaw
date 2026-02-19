@@ -18,7 +18,13 @@ You are running on a local model with a limited context window. Follow these rul
 
 ### Proactive Memory
 - After completing any meaningful step, write a brief summary to \`memory/progress.md\` (create \`memory/\` if needed).
-- Track decisions, file paths you've modified, and current task state in \`memory/state.md\`.
+- **Always keep \`memory/state.md\` up to date** — it is the primary context source for the fast local model that handles simple queries. Use these sections:
+  - **Active tasks**: what the user is working on right now
+  - **Recent decisions**: key choices or outcomes from this session
+  - **Pending items**: things the user asked about or needs to follow up on
+  - **User context**: name, preferences, time of day awareness, mood cues
+  - **Environment**: relevant tools, services, or accounts in use
+- Keep \`memory/state.md\` under 600 words so it fits in the fast model's small context window.
 - Before starting work, read \`memory/state.md\` and \`memory/progress.md\` if they exist — they contain context from earlier in this session that may have been compacted away.
 - When you learn user preferences or project conventions, write them to \`memory/notes.md\`.
 

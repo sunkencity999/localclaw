@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
@@ -354,6 +356,11 @@ export async function runPreparedReply(
     isNewSession,
   });
   const authProfileIdSource = sessionEntry?.authProfileOverrideSource;
+
+  // Read a compact memory snapshot for the fast model's system prompt.
+  // The fast model has no tools, so this is its only source of dynamic context.
+  const memorySnapshot = smartRouted ? await readMemorySnapshot(workspaceDir) : undefined;
+
   const followupRun = {
     prompt: queuedBody,
     messageId: sessionCtx.MessageSidFull ?? sessionCtx.MessageSid,
@@ -404,6 +411,7 @@ export async function runPreparedReply(
       extraSystemPrompt: smartRouted
         ? [
             extraSystemPrompt,
+            memorySnapshot,
             "IMPORTANT: You are in fast chat mode. Respond conversationally in plain text only. Do NOT output any JSON, tool calls, function calls, or code blocks. Do NOT attempt to use memory_get, read, email, or any other tool. Just reply naturally as a helpful assistant.",
           ]
             .filter(Boolean)
@@ -439,4 +447,31 @@ export async function runPreparedReply(
     shouldInjectGroupIntro,
     typingMode,
   });
+}
+
+// ── Fast-model memory snapshot ────────────────────────────────────────────────
+
+/** Max characters from memory/state.md injected into the fast model's system prompt. */
+const MEMORY_SNAPSHOT_MAX_CHARS = 800;
+
+/**
+ * Read `memory/state.md` from the agent workspace and return a compact
+ * system-prompt block.  The fast model has no tools, so this is its only
+ * source of dynamic context about the user's current situation.
+ *
+ * Returns `undefined` when the file doesn't exist or is empty.
+ */
+async function readMemorySnapshot(workspaceDir: string): Promise<string | undefined> {
+  const statePath = path.join(workspaceDir, "memory", "state.md");
+  try {
+    let content = await readFile(statePath, "utf-8");
+    content = content.trim();
+    if (!content) return undefined;
+    if (content.length > MEMORY_SNAPSHOT_MAX_CHARS) {
+      content = content.slice(0, MEMORY_SNAPSHOT_MAX_CHARS) + "\n[…truncated]";
+    }
+    return `## Current Memory State (read-only snapshot)\n\n${content}`;
+  } catch {
+    return undefined;
+  }
 }
