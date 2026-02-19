@@ -184,9 +184,9 @@ All tools use JSON schema parameters and return structured results with both hum
 
 ---
 
-## Third-Party Integrations (Jira, Confluence, Slack)
+## Third-Party Integrations (Jira, Confluence, Slack, Email)
 
-LocalClaw includes built-in integrations for **Jira**, **Confluence**, and **Slack** that give the agent direct, structured access to your team's project management, documentation, and communication tools. All API calls run locally from your machine — no intermediary cloud services.
+LocalClaw includes built-in integrations for **Jira**, **Confluence**, **Slack**, and **Email (Gmail)** that give the agent direct, structured access to your team's project management, documentation, communication, and email tools. All API calls run locally from your machine — no intermediary cloud services.
 
 ### Quick Setup
 
@@ -450,9 +450,114 @@ The Slack integration includes several quality-of-life features:
 
 ---
 
+### Email (Gmail) Integration
+
+Connect your Gmail accounts to let the agent search, read, send, and reply to emails. Supports **multi-account** — configure personal and work accounts side by side. All operations run locally via the [`gog` CLI](https://github.com/rubiojr/gog) with OAuth authentication.
+
+#### Capabilities
+
+| Action | Description |
+|--------|-------------|
+| **Search emails** | Query emails using Gmail search syntax (e.g. `from:boss is:unread`, `subject:invoice newer_than:7d`) |
+| **Read messages** | Fetch full message content by ID — headers, body, thread context |
+| **Send emails** | Compose and send new emails with to, cc, subject, and body |
+| **Reply to threads** | Reply (or reply-all) to existing messages/threads |
+| **List labels** | Enumerate Gmail labels for any account |
+| **List accounts** | Show configured accounts and which is the default |
+
+#### Prerequisites
+
+1. The [`gog` CLI](https://github.com/rubiojr/gog) installed and on your PATH
+2. Each Gmail account authenticated via `gog auth login --account you@gmail.com`
+3. For Google Workspace accounts with custom OAuth credentials, also pass `--client <name>` during auth
+
+#### Email Configuration
+
+```json5
+{
+  integrations: {
+    email: {
+      enabled: true,
+      accounts: [
+        { address: "you@gmail.com", label: "home" },
+        { address: "you@company.com", label: "work", client: "workspace" },
+      ],
+      defaultAccount: "you@gmail.com",    // Used when no account is specified
+      timeoutSeconds: 30,                  // Optional: CLI timeout (default: 30)
+    },
+  },
+}
+```
+
+| Config Key | Required | Description |
+|------------|----------|-------------|
+| `accounts` | Yes | Array of Gmail accounts, each with `address` and optional `label`/`client` |
+| `defaultAccount` | No | Default account address (falls back to first in list) |
+| `client` | No | Per-account gog OAuth client name (for Workspace custom credentials) |
+| `timeoutSeconds` | No | CLI command timeout in seconds (default: 30) |
+
+#### Multi-Account Usage
+
+The agent resolves accounts by **address**, **label**, or **partial match**:
+
+- *"Search my work email for messages from the CFO"* — resolves `work` label to the work account
+- *"Send an email from home to alice@example.com"* — resolves `home` label
+- *"Read message abc123"* — uses the default account
+
+#### Example Agent Interactions
+
+- *"Search my email for unread messages from the last 3 days"* — agent runs a Gmail search and returns matching messages
+- *"Read the email with ID 18f3a2b4c5d6e7f8"* — agent fetches the full message content
+- *"Send an email to alice@example.com with subject 'Meeting notes' and body with the summary"* — agent composes and sends
+- *"Reply to the thread about the deployment with 'Looks good, ship it'"* — agent replies within the thread
+- *"What labels are set up on my work email?"* — agent lists Gmail labels for the work account
+
+#### Gmail Watch (Real-Time Notifications)
+
+For real-time email notifications (instead of polling), configure the Gmail watcher in your hooks config. This uses Google Cloud Pub/Sub push notifications to trigger hooks when new emails arrive.
+
+**Single account:**
+
+```json5
+{
+  hooks: {
+    enabled: true,
+    token: "your-hook-token",
+    gmail: {
+      account: "you@gmail.com",
+      topic: "projects/your-project/topics/gog-gmail-watch",
+      pushToken: "your-push-verification-token",
+    },
+  },
+}
+```
+
+**Multi-account** (each account gets its own watcher process on a separate port):
+
+```json5
+{
+  hooks: {
+    enabled: true,
+    token: "your-hook-token",
+    gmail: {
+      topic: "projects/your-project/topics/gog-gmail-watch",
+      pushToken: "shared-push-token",
+      accounts: [
+        { address: "you@gmail.com", label: "home" },
+        { address: "you@company.com", label: "work", port: 8790 },
+      ],
+    },
+  },
+}
+```
+
+Ports auto-increment from the base (8788) when not specified. The gateway spawns one `gog gmail watch serve` process per account and automatically renews the Gmail API watch registration.
+
+---
+
 ### Manual Configuration
 
-All three integrations can be configured in a single `integrations` block in your config file (`~/.localclaw/openclaw.local.json`):
+All integrations can be configured in a single `integrations` block in your config file (`~/.localclaw/openclaw.local.json`):
 
 ```json5
 {
@@ -477,6 +582,14 @@ All three integrations can be configured in a single `integrations` block in you
       botToken: "xoxb-...",
       userToken: "xoxp-...",              // Recommended: enables DMs + search
       defaultChannel: "#general",
+    },
+    email: {
+      enabled: true,
+      accounts: [
+        { address: "you@gmail.com", label: "home" },
+        { address: "you@company.com", label: "work", client: "workspace" },
+      ],
+      defaultAccount: "you@gmail.com",
     },
   },
 }
