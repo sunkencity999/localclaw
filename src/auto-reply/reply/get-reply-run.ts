@@ -401,7 +401,14 @@ export async function runPreparedReply(
       disableTools: smartRouted === true ? true : undefined,
       blockReplyBreak: resolvedBlockStreamingBreak,
       ownerNumbers: command.ownerList.length > 0 ? command.ownerList : undefined,
-      extraSystemPrompt: extraSystemPrompt || undefined,
+      extraSystemPrompt: smartRouted
+        ? [
+            extraSystemPrompt,
+            "IMPORTANT: You are in fast chat mode. Respond conversationally in plain text only. Do NOT output any JSON, tool calls, function calls, or code blocks. Do NOT attempt to use memory_get, read, email, or any other tool. Just reply naturally as a helpful assistant.",
+          ]
+            .filter(Boolean)
+            .join("\n\n") || undefined
+        : extraSystemPrompt || undefined,
       ...(isReasoningTagProvider(provider) ? { enforceFinalTag: true } : {}),
     },
   };
