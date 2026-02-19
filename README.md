@@ -184,6 +184,90 @@ All tools use JSON schema parameters and return structured results with both hum
 
 ---
 
+## Multi-Channel Messaging
+
+LocalClaw includes the full OpenClaw multi-channel messaging stack. The agent can receive and respond to messages across **14+ platforms** — all running locally on your machine.
+
+### Supported Channels
+
+| Channel | Protocol | Setup complexity |
+|---------|----------|-----------------|
+| **Telegram** | Bot API (grammY) | Easy — create a bot with @BotFather, paste the token |
+| **WhatsApp** | Baileys (Web) | Easy — scan a QR code to link your number |
+| **Discord** | discord.js (Bot API) | Easy — create a bot app, paste the token |
+| **Slack** | Bolt (Socket Mode) | Moderate — create a Slack app with scopes |
+| **Signal** | signal-cli (linked device) | Moderate — requires signal-cli setup |
+| **iMessage** | imsg (legacy) | macOS only — work in progress |
+| **BlueBubbles** | iMessage via BlueBubbles | macOS only — recommended for iMessage |
+| **Google Chat** | Chat API (HTTP webhook) | Moderate — Google Workspace admin required |
+| **Microsoft Teams** | Bot Framework (extension) | Moderate — Azure bot registration |
+| **Matrix** | matrix-js-sdk (extension) | Moderate — homeserver + access token |
+| **Mattermost** | Extension | Moderate |
+| **Zalo** | Zalo OA (extension) | Moderate |
+| **Twitch** | Extension | Moderate |
+| **WebChat** | Built-in web UI | None — included with the gateway dashboard |
+
+### Quick Start (Telegram Example)
+
+The fastest way to add a channel is during onboarding:
+
+```bash
+localclaw onboard
+# → Select "Telegram" at the channel step
+# → Paste your bot token from @BotFather
+```
+
+Or add a channel after initial setup:
+
+```bash
+# Interactive channel setup
+localclaw channels add --channel telegram
+
+# Or set the token directly
+localclaw channels add --channel telegram --token "123456:ABC-DEF..."
+
+# Check channel status
+localclaw channels status
+
+# Pair a new sender (security)
+localclaw pairing approve telegram <code>
+```
+
+### Channel Configuration
+
+Channels are configured in the `channels` block of `~/.localclaw/openclaw.local.json`:
+
+```json5
+{
+  channels: {
+    telegram: {
+      botToken: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+      allowFrom: ["+15555550123"],  // Allowed sender phone numbers / usernames
+    },
+    whatsapp: {
+      allowFrom: ["+15555550123"],
+    },
+    discord: {
+      botToken: "MTIzNDU2Nzg5MDEyMzQ1Njc4OQ...",
+      allowFrom: ["username#1234"],
+    },
+  },
+}
+```
+
+### Security Defaults
+
+LocalClaw treats all inbound DMs as **untrusted input** by default:
+
+- **DM pairing** (default) — unknown senders receive a short pairing code. The bot does not process their message until approved.
+- **Approve senders** with `localclaw pairing approve <channel> <code>`
+- **Open DMs** require explicit opt-in: set `dmPolicy: "open"` and add `"*"` to `allowFrom`
+- Run `localclaw doctor` to surface risky or misconfigured DM policies
+
+For full channel documentation, see the [OpenClaw channel docs](https://docs.openclaw.ai/channels) — all commands work with `localclaw` in place of `openclaw`.
+
+---
+
 ## Third-Party Integrations (Jira, Confluence, Slack, Email)
 
 LocalClaw includes built-in integrations for **Jira**, **Confluence**, **Slack**, and **Email (Gmail)** that give the agent direct, structured access to your team's project management, documentation, communication, and email tools. All API calls run locally from your machine — no intermediary cloud services.
