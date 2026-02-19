@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { DEFAULT_CHAT_CHANNEL } from "../../channels/registry.js";
 import { agentCliCommand } from "../../commands/agent-via-gateway.js";
 import {
@@ -7,6 +8,7 @@ import {
   agentsListCommand,
   agentsSetIdentityCommand,
 } from "../../commands/agents.js";
+import { loadConfig } from "../../config/config.js";
 import { setVerbose } from "../../globals.js";
 import { defaultRuntime } from "../../runtime.js";
 import { formatDocsLink } from "../../terminal/links.js";
@@ -18,6 +20,67 @@ import { formatHelpExamples } from "../help-format.js";
 import { collectOption } from "./helpers.js";
 
 export function registerAgentCommands(program: Command, args: { agentChannelOptions: string }) {
+  program
+    .command("ask")
+    .description("Ask the default agent in the default session")
+    .argument("<message...>", "Message to send")
+    .option("--agent <id>", "Agent id override (default: config default agent)")
+    .option("--thinking <level>", "Thinking level: off | minimal | low | medium | high")
+    .option("--verbose <on|off>", "Persist agent verbose level for the session")
+    .option(
+      "--local",
+      "Run the embedded agent locally (requires model provider API keys in your shell)",
+      false,
+    )
+    .option("--json", "Output result as JSON", false)
+    .option(
+      "--timeout <seconds>",
+      "Override agent command timeout (seconds, default 600 or config value)",
+    )
+    .addHelpText(
+      "after",
+      () =>
+        `
+${theme.heading("Examples:")}
+${formatHelpExamples([
+  ['openclaw ask "status update"', "Ask the default agent in the default session."],
+  ['openclaw ask "summarize logs" --agent ops', "Ask a specific agent."],
+  ['openclaw ask "trace this" --thinking medium --json', "Control thinking and output JSON."],
+])}
+
+${theme.muted("Docs:")} ${formatDocsLink("/cli/agent", "docs.openclaw.ai/cli/agent")}`,
+    )
+    .action(async (messageParts: string[], opts) => {
+      const message = Array.isArray(messageParts)
+        ? messageParts
+            .map((part) => String(part))
+            .join(" ")
+            .trim()
+        : String(messageParts ?? "").trim();
+      const configuredDefaultAgent = resolveDefaultAgentId(loadConfig());
+      const agent =
+        typeof opts.agent === "string" && opts.agent.trim() ? opts.agent : configuredDefaultAgent;
+
+      const verboseLevel = typeof opts.verbose === "string" ? opts.verbose.toLowerCase() : "";
+      setVerbose(verboseLevel === "on");
+      const deps = createDefaultDeps();
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await agentCliCommand(
+          {
+            message,
+            agent,
+            thinking: opts.thinking as string | undefined,
+            verbose: opts.verbose as string | undefined,
+            local: Boolean(opts.local),
+            json: Boolean(opts.json),
+            timeout: opts.timeout as string | undefined,
+          },
+          defaultRuntime,
+          deps,
+        );
+      });
+    });
+
   program
     .command("agent")
     .description("Run an agent turn via the Gateway (use --local for embedded)")
