@@ -68,6 +68,19 @@ describe("classifyMessageComplexity", () => {
     expect(classifyMessageComplexity("/model ollama/qwen3").complexity).toBe("complex");
   });
 
+  it("classifies tool-requiring resource keywords as moderate", () => {
+    expect(
+      classifyMessageComplexity(
+        "Do I have any work emails in my inbox from today I should address?",
+      ).complexity,
+    ).toBe("moderate");
+    expect(classifyMessageComplexity("any unread emails?").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("what's on my calendar today?").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("do I have any meetings?").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("what's the weather?").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("check my inbox").complexity).toBe("complex"); // "check" is complex
+  });
+
   it("classifies empty messages as simple", () => {
     expect(classifyMessageComplexity("").complexity).toBe("simple");
     expect(classifyMessageComplexity("   ").complexity).toBe("simple");

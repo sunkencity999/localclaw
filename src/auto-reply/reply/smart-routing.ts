@@ -38,6 +38,7 @@ export type RoutingDecision = {
  * the power (or cost) of the API orchestrator.
  */
 const MODERATE_KEYWORDS = [
+  // Action verbs for single-step tool calls
   "show",
   "list",
   "look",
@@ -47,6 +48,35 @@ const MODERATE_KEYWORDS = [
   "scan",
   "open",
   "monitor",
+  // Email / messaging — requires tool access
+  "email",
+  "emails",
+  "inbox",
+  "mail",
+  "mailbox",
+  "unread",
+  // Calendar / scheduling — requires tool access
+  "calendar",
+  "meeting",
+  "meetings",
+  "appointment",
+  "appointments",
+  "agenda",
+  // Notes / reminders — requires tool access
+  "reminder",
+  "reminders",
+  "note",
+  "notes",
+  // Contacts / people lookup
+  "contact",
+  "contacts",
+  // Browser / web — requires tool access
+  "browse",
+  "browser",
+  "webpage",
+  // Weather / external data
+  "weather",
+  "forecast",
 ];
 
 /**
