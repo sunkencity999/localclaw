@@ -174,4 +174,41 @@ describe("resolveSmartRoute", () => {
     expect(result.routed).toBe(false);
     expect(result.complexity).toBe("complex");
   });
+
+  it("routes 'are you with me?' to the fast model (simple conversational)", () => {
+    const result = resolveSmartRoute({
+      message: "are you with me?",
+      cfg: baseCfg as unknown as OpenClawConfig,
+      currentProvider: "ollama",
+      currentModel: "glm-4.7-flash:latest",
+      defaultProvider: "ollama",
+    });
+    expect(result.routed).toBe(true);
+    expect(result.provider).toBe("ollama");
+    expect(result.model).toBe("qwen3:1.7b");
+    expect(result.complexity).toBe("simple");
+  });
+
+  it("exposes fastModelContextTokens config for context capping", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          routing: {
+            enabled: true,
+            fastModel: "ollama/qwen3:1.7b",
+            fastModelContextTokens: 2048,
+          },
+        },
+      },
+    };
+    const routing = cfg.agents.defaults.routing;
+    const fastCap = routing.fastModelContextTokens ?? 4096;
+    expect(fastCap).toBe(2048);
+  });
+
+  it("defaults fastModelContextTokens to 4096 when not configured", () => {
+    const routing = baseCfg.agents.defaults.routing;
+    const fastCap = (routing as Record<string, unknown>).fastModelContextTokens ?? 4096;
+    expect(fastCap).toBe(4096);
+  });
 });

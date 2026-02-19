@@ -139,6 +139,7 @@ export const AgentDefaultsSchema = z
         enabled: z.boolean().optional(),
         fastModel: z.string().optional(),
         maxSimpleLength: z.number().int().positive().optional(),
+        fastModelContextTokens: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),

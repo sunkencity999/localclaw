@@ -98,6 +98,8 @@ export type AgentRoutingConfig = {
   fastModel?: string;
   /** Max message length (chars) to consider for fast-model routing (default: 150). */
   maxSimpleLength?: number;
+  /** Max context tokens when routed to the fast model (default: 4096). Keeps history small for tiny models. */
+  fastModelContextTokens?: number;
 };
 
 export type OrchestratorStrategy = "auto" | "always" | "fallback-only";

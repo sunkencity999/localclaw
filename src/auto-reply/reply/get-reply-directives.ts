@@ -434,6 +434,13 @@ export async function resolveReplyDirectives(params: {
     model,
   });
 
+  // Cap context for fast-model routing so tiny models don't choke on huge session history.
+  if (smartRouted) {
+    const routing = cfg.agents?.defaults?.routing;
+    const fastCap = routing?.fastModelContextTokens ?? 4096;
+    contextTokens = Math.min(contextTokens, fastCap);
+  }
+
   const initialModelLabel = `${provider}/${model}`;
   const formatModelSwitchEvent = (label: string, alias?: string) =>
     alias ? `Model switched to ${alias} (${label}).` : `Model switched to ${label}.`;
