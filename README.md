@@ -40,9 +40,64 @@ The gateway now validates your entire model stack on every boot:
 - Checks that your model's context window meets minimum requirements
 - Logs clear warnings if anything is misconfigured — no more silent failures
 
-### Smart Model Routing
+### Three-Tier Smart Model Routing
 
-Simple queries (greetings, yes/no questions, quick lookups) are automatically routed to a faster, smaller model while complex requests (code generation, analysis, multi-step reasoning) go to your primary model. This saves time and compute without sacrificing quality. Configured via `agents.defaults.routing` in your config.
+LocalClaw uses a heuristic classifier to route every message to the right model tier — no LLM call overhead, just fast keyword and pattern matching:
+
+| Tier | Handles | Example messages | Typical model |
+|------|---------|-----------------|---------------|
+| **Fast (tiny)** | Greetings, yes/no, short chat | "hi", "thanks!", "what time is it?" | `llama3.2` (3B) |
+| **Local (primary)** | Lookups, simple tool calls | "show my calendar", "list files" | `glm-4.7-flash-fast` (30B) |
+| **API (orchestrator)** | Multi-step reasoning, code, external APIs | "fix the auth bug", "search my Jira issues" | `gpt-5.2-codex`, `claude-sonnet-4` |
+
+The classifier categorizes messages into three complexity levels:
+
+- **Simple** — no action keywords, short conversational messages → routed to the tiny fast model for sub-second responses
+- **Moderate** — display/lookup keywords (`show`, `list`, `find`, `open`, `inspect`) → stays on local primary model
+- **Complex** — reasoning keywords (`fix`, `debug`, `create`, `build`), external API keywords (`search`, `send`, `read`, `check`, `fetch`), code patterns, file paths, URLs → escalated to the API orchestrator model
+
+This means users without API keys still get a fully functional agent (fast model + local model), while users with API access get the best quality for demanding tasks.
+
+#### Model Strategy Presets
+
+During onboarding (`localclaw configure`), you can choose a strategy preset:
+
+| Preset | Fast model | Primary model | Orchestrator | Best for |
+|--------|-----------|---------------|-------------|----------|
+| **Balanced (recommended)** | Local tiny (3B) | Local mid (8B-30B) | API model | Most users — fast chat, capable tools, quality complex tasks |
+| **Local only** | Local tiny (3B) | Local mid (8B-30B) | Disabled | Privacy-first, air-gapped, or no API budget |
+| **All-API (Enterprise)** | API model | API model | API model (always) | Unlimited token spend, maximum quality |
+
+#### Manual Configuration
+
+```json5
+{
+  agents: {
+    defaults: {
+      model: { primary: "ollama/glm-4.7-flash-fast:latest" },
+      // Fast model for simple chat (tier 1)
+      routing: {
+        enabled: true,
+        fastModel: "ollama/llama3.2:latest",
+        maxSimpleLength: 250,
+      },
+      // API model for complex tasks (tier 3)
+      orchestrator: {
+        enabled: true,
+        model: "openai-codex/gpt-5.2-codex",
+        strategy: "auto",           // "auto" | "always" | "fallback-only"
+        maxSimpleLength: 250,
+      },
+    },
+  },
+}
+```
+
+| Orchestrator strategy | Behavior |
+|---|---|
+| `auto` (default) | Complex messages → API, simple/moderate → local |
+| `always` | Always try API first, local is fallback on failure |
+| `fallback-only` | Local handles everything, API only when local fails |
 
 ### Session Auto-Save
 
