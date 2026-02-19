@@ -42,6 +42,7 @@ import { defaultRuntime } from "../runtime.js";
 import { resolveUserPath } from "../utils.js";
 import { finalizeOnboardingWizard } from "./onboarding.finalize.js";
 import { configureGatewayForOnboarding } from "./onboarding.gateway-config.js";
+import { promptModelStrategy } from "./onboarding.model-strategy.js";
 import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 
 async function requireRiskAcknowledgement(params: {
@@ -419,17 +420,15 @@ export async function runOnboardingWizard(
   });
   nextConfig = authResult.config;
 
+  // Three-tier model strategy preset (balanced / local-only / all-API).
+  // Replaces the old single-model picker with a guided strategy selection
+  // that configures fast model, primary model, and orchestrator in one step.
   if (authChoiceFromPrompt) {
-    const modelSelection = await promptDefaultModelWithLocalOptions({
+    const strategyResult = await promptModelStrategy({
       config: nextConfig,
       prompter,
-      allowKeep: true,
-      ignoreAllowlist: true,
-      preferredProvider: resolvePreferredProviderForAuthChoice(authChoice),
     });
-    if (modelSelection.model) {
-      nextConfig = applyPrimaryModel(nextConfig, modelSelection.model);
-    }
+    nextConfig = strategyResult.config;
   }
 
   await warnIfModelConfigLooksOff(nextConfig, prompter);
