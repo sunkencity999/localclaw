@@ -486,6 +486,13 @@ export async function runTui(opts: TuiOptions) {
     const reasoning = sessionInfo.reasoningLevel ?? "off";
     const reasoningLabel =
       reasoning === "on" ? "reasoning" : reasoning === "stream" ? "reasoning:stream" : null;
+    // Show the configured primary model when routing makes the current model differ.
+    const primaryModelRef =
+      typeof config.agents?.defaults?.model === "object"
+        ? config.agents.defaults.model.primary
+        : undefined;
+    const primaryLabel =
+      primaryModelRef && primaryModelRef !== modelLabel ? `primary: ${primaryModelRef}` : null;
     const orchCfg = config.agents?.defaults?.orchestrator;
     const orchLabel =
       orchCfg?.enabled && orchCfg.model
@@ -495,6 +502,7 @@ export async function runTui(opts: TuiOptions) {
       `agent ${agentLabel}`,
       `session ${sessionLabel}`,
       modelLabel,
+      primaryLabel,
       orchLabel,
       think !== "off" ? `think ${think}` : null,
       verbose !== "off" ? `verbose ${verbose}` : null,
