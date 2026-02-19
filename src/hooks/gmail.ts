@@ -250,6 +250,57 @@ export function buildGogWatchServeArgs(cfg: GmailHookRuntimeConfig): string[] {
   return args;
 }
 
+/**
+ * Resolve runtime configs for all Gmail accounts.
+ * If `hooks.gmail.accounts` is set, one config per entry; otherwise falls back
+ * to the legacy single `hooks.gmail.account` field.
+ * Each account gets a unique serve port (base port + index offset).
+ */
+export function resolveGmailMultiAccountConfigs(
+  cfg: OpenClawConfig,
+  overrides: GmailHookOverrides,
+): { ok: true; value: GmailHookRuntimeConfig[] } | { ok: false; error: string } {
+  const hooks = cfg.hooks;
+  const gmail = hooks?.gmail;
+  const accounts = gmail?.accounts;
+
+  // Multi-account path
+  if (accounts && accounts.length > 0) {
+    const basePort = gmail?.serve?.port ?? DEFAULT_GMAIL_SERVE_PORT;
+    const configs: GmailHookRuntimeConfig[] = [];
+
+    for (let i = 0; i < accounts.length; i++) {
+      const acct = accounts[i];
+      const acctOverrides: GmailHookOverrides = {
+        ...overrides,
+        account: acct.address,
+        label: acct.label ?? overrides.label,
+        topic: acct.topic ?? overrides.topic,
+        subscription: acct.subscription ?? overrides.subscription,
+        pushToken: acct.pushToken ?? overrides.pushToken,
+        servePort: acct.port ?? basePort + i,
+      };
+      const resolved = resolveGmailHookRuntimeConfig(
+        // Patch the legacy account field so the single-account resolver picks it up
+        { ...cfg, hooks: { ...hooks, gmail: { ...gmail, account: acct.address } } },
+        acctOverrides,
+      );
+      if (!resolved.ok) {
+        return { ok: false, error: `account ${acct.address}: ${resolved.error}` };
+      }
+      configs.push(resolved.value);
+    }
+    return { ok: true, value: configs };
+  }
+
+  // Legacy single-account fallback
+  const resolved = resolveGmailHookRuntimeConfig(cfg, overrides);
+  if (!resolved.ok) {
+    return resolved;
+  }
+  return { ok: true, value: [resolved.value] };
+}
+
 export function buildTopicPath(projectId: string, topicName: string): string {
   return `projects/${projectId}/topics/${topicName}`;
 }

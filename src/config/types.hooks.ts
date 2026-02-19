@@ -40,8 +40,27 @@ export type HookMappingConfig = {
 
 export type HooksGmailTailscaleMode = "off" | "serve" | "funnel";
 
+/** Per-account overrides for multi-account Gmail watchers. */
+export type HooksGmailAccountConfig = {
+  /** Gmail address (must be authenticated with gog). */
+  address: string;
+  /** Human-friendly label (e.g. "home", "work"). */
+  label?: string;
+  /** Per-account Pub/Sub topic override. */
+  topic?: string;
+  /** Per-account Pub/Sub subscription override. */
+  subscription?: string;
+  /** Per-account push verification token override. */
+  pushToken?: string;
+  /** Per-account serve port override (default: base port + index). */
+  port?: number;
+};
+
 export type HooksGmailConfig = {
+  /** Legacy single-account field (use `accounts` for multi-account). */
   account?: string;
+  /** Multi-account: list of Gmail accounts to watch. Takes precedence over `account`. */
+  accounts?: HooksGmailAccountConfig[];
   label?: string;
   topic?: string;
   subscription?: string;

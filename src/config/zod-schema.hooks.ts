@@ -87,9 +87,21 @@ export const InternalHooksSchema = z
   .strict()
   .optional();
 
+const HooksGmailAccountSchema = z
+  .object({
+    address: z.string(),
+    label: z.string().optional(),
+    topic: z.string().optional(),
+    subscription: z.string().optional(),
+    pushToken: z.string().optional(),
+    port: z.number().int().positive().optional(),
+  })
+  .strict();
+
 export const HooksGmailSchema = z
   .object({
     account: z.string().optional(),
+    accounts: z.array(HooksGmailAccountSchema).optional(),
     label: z.string().optional(),
     topic: z.string().optional(),
     subscription: z.string().optional(),

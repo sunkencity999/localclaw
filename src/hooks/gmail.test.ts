@@ -5,6 +5,7 @@ import {
   buildTopicPath,
   parseTopicPath,
   resolveGmailHookRuntimeConfig,
+  resolveGmailMultiAccountConfigs,
 } from "./gmail.js";
 
 const baseConfig = {
@@ -154,5 +155,86 @@ describe("gmail hook config", () => {
       expect(result.value.tailscale.path).toBe("/custom");
       expect(result.value.tailscale.target).toBe("http://127.0.0.1:8788/custom");
     }
+  });
+});
+
+describe("resolveGmailMultiAccountConfigs", () => {
+  it("resolves multiple accounts with auto-incremented ports", () => {
+    const cfg: OpenClawConfig = {
+      hooks: {
+        token: "hook-token",
+        gmail: {
+          topic: "projects/demo/topics/gog-gmail-watch",
+          pushToken: "push-token",
+          accounts: [{ address: "home@gmail.com" }, { address: "work@company.com" }],
+        },
+      },
+    };
+    const result = resolveGmailMultiAccountConfigs(cfg, {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toHaveLength(2);
+      expect(result.value[0].account).toBe("home@gmail.com");
+      expect(result.value[0].serve.port).toBe(8788);
+      expect(result.value[1].account).toBe("work@company.com");
+      expect(result.value[1].serve.port).toBe(8789);
+    }
+  });
+
+  it("applies per-account overrides", () => {
+    const cfg: OpenClawConfig = {
+      hooks: {
+        token: "hook-token",
+        gmail: {
+          topic: "projects/demo/topics/default-topic",
+          pushToken: "push-token",
+          accounts: [
+            {
+              address: "home@gmail.com",
+              label: "personal",
+              topic: "projects/demo/topics/home-topic",
+              port: 9000,
+            },
+            { address: "work@company.com" },
+          ],
+        },
+      },
+    };
+    const result = resolveGmailMultiAccountConfigs(cfg, {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value[0].account).toBe("home@gmail.com");
+      expect(result.value[0].label).toBe("personal");
+      expect(result.value[0].topic).toBe("projects/demo/topics/home-topic");
+      expect(result.value[0].serve.port).toBe(9000);
+      expect(result.value[1].account).toBe("work@company.com");
+      expect(result.value[1].topic).toBe("projects/demo/topics/default-topic");
+      expect(result.value[1].serve.port).toBe(8789);
+    }
+  });
+
+  it("falls back to legacy single-account config", () => {
+    const result = resolveGmailMultiAccountConfigs(baseConfig, {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].account).toBe("openclaw@gmail.com");
+      expect(result.value[0].serve.port).toBe(8788);
+    }
+  });
+
+  it("fails if a per-account config is invalid", () => {
+    const cfg: OpenClawConfig = {
+      hooks: {
+        // Missing hook token
+        gmail: {
+          topic: "projects/demo/topics/gog-gmail-watch",
+          pushToken: "push-token",
+          accounts: [{ address: "home@gmail.com" }],
+        },
+      },
+    };
+    const result = resolveGmailMultiAccountConfigs(cfg, {});
+    expect(result.ok).toBe(false);
   });
 });
