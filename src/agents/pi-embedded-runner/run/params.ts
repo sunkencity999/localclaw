@@ -69,6 +69,9 @@ export type RunEmbeddedPiAgentParams = {
   execOverrides?: Pick<ExecToolDefaults, "host" | "security" | "ask" | "node">;
   bashElevated?: ExecElevatedDefaults;
   timeoutMs: number;
+  /** Signal that external fallbacks exist (e.g. orchestrator-injected).
+   *  When true, timeouts throw FailoverError even if no explicit config fallbacks are set. */
+  hasFallbacks?: boolean;
   runId: string;
   abortSignal?: AbortSignal;
   shouldEmitToolResult?: () => boolean;

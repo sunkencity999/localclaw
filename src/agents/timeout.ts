@@ -2,6 +2,11 @@ import type { OpenClawConfig } from "../config/config.js";
 
 const DEFAULT_AGENT_TIMEOUT_SECONDS = 600;
 
+/** Timeout for local models when an API orchestrator fallback is available. */
+export const LOCAL_WITH_API_FALLBACK_TIMEOUT_SECONDS = 240;
+/** Timeout for local-only setups (no API fallback). */
+export const LOCAL_ONLY_TIMEOUT_SECONDS = 600;
+
 const normalizeNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
 
@@ -43,4 +48,25 @@ export function resolveAgentTimeoutMs(opts: {
     return Math.max(overrideSeconds * 1000, minMs);
   }
   return Math.max(defaultMs, minMs);
+}
+
+/**
+ * Resolve a timeout for local model providers, taking API fallback
+ * availability into account.  When an orchestrator API model is configured,
+ * use a shorter timeout (4 min) so slow local runs escalate quickly.
+ * Local-only setups get a generous 10 min timeout.
+ */
+export function resolveLocalModelTimeoutMs(opts: {
+  cfg?: OpenClawConfig;
+  hasApiFallback: boolean;
+}): number {
+  // Explicit user override always wins.
+  const explicit = normalizeNumber(opts.cfg?.agents?.defaults?.timeoutSeconds);
+  if (explicit !== undefined) {
+    return Math.max(explicit * 1000, 1000);
+  }
+  const seconds = opts.hasApiFallback
+    ? LOCAL_WITH_API_FALLBACK_TIMEOUT_SECONDS
+    : LOCAL_ONLY_TIMEOUT_SECONDS;
+  return seconds * 1000;
 }

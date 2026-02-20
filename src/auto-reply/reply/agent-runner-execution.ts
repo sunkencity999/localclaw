@@ -10,6 +10,7 @@ import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionId } from "../../agents/cli-session.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
+import { normalizeProviderId } from "../../agents/model-selection.js";
 import {
   isCompactionFailureError,
   isContextOverflowError,
@@ -17,6 +18,7 @@ import {
   sanitizeUserFacingText,
 } from "../../agents/pi-embedded-helpers.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
+import { resolveLocalModelTimeoutMs } from "../../agents/timeout.js";
 import {
   resolveAgentIdFromSessionKey,
   resolveGroupSessionKey,
@@ -261,6 +263,21 @@ export async function runAgentTurnWithFallback(params: {
             provider === params.followupRun.run.provider
               ? params.followupRun.run.authProfileId
               : undefined;
+          // Resolve dynamic timeout: local providers get a shorter timeout
+          // when an API orchestrator fallback is available.
+          const hasOrchestratorFallback = (orchestratorFallbacks?.length ?? 0) > 1;
+          const normalizedProv = normalizeProviderId(provider);
+          const isLocal =
+            normalizedProv === "ollama" ||
+            normalizedProv === "lmstudio" ||
+            normalizedProv === "vllm";
+          const effectiveTimeoutMs = isLocal
+            ? resolveLocalModelTimeoutMs({
+                cfg: params.followupRun.run.config,
+                hasApiFallback: hasOrchestratorFallback,
+              })
+            : params.followupRun.run.timeoutMs;
+
           return runEmbeddedPiAgent({
             sessionId: params.followupRun.run.sessionId,
             sessionKey: params.sessionKey,
@@ -298,6 +315,7 @@ export async function runAgentTurnWithFallback(params: {
             authProfileIdSource: authProfileId
               ? params.followupRun.run.authProfileIdSource
               : undefined,
+            hasFallbacks: hasOrchestratorFallback,
             thinkLevel: params.followupRun.run.thinkLevel,
             verboseLevel: params.followupRun.run.verboseLevel,
             reasoningLevel: params.followupRun.run.reasoningLevel,
@@ -313,7 +331,7 @@ export async function runAgentTurnWithFallback(params: {
               return isMarkdownCapableMessageChannel(channel) ? "markdown" : "plain";
             })(),
             bashElevated: params.followupRun.run.bashElevated,
-            timeoutMs: params.followupRun.run.timeoutMs,
+            timeoutMs: effectiveTimeoutMs,
             runId,
             images: params.opts?.images,
             abortSignal: params.opts?.abortSignal,

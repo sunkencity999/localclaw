@@ -538,8 +538,10 @@ export function resolveOrchestratorFallbacksForRun(params: {
     return [primaryKey, ...existing];
   }
 
-  // "fallback-only" and running on local → add orchestrator as fallback
-  if (strategy === "fallback-only" && runKey === primaryKey) {
+  // Running on local primary → add orchestrator as fallback so that
+  // timeouts and errors can escalate to the API model.  Applies to both
+  // "auto" and "fallback-only" strategies.
+  if ((strategy === "auto" || strategy === "fallback-only") && runKey === primaryKey) {
     const existing = params.agentFallbacks ?? [];
     if (existing.includes(orchKey)) {
       return existing;

@@ -435,7 +435,8 @@ export function createEmailTool(options?: { config?: OpenClawConfig }): AnyAgent
     label: "Email",
     name: "email",
     description: [
-      "Gmail integration for reading and sending email via gog CLI.",
+      "PREFERRED tool for ALL email operations — use this instead of exec/shell for email tasks.",
+      "Gmail integration for reading, sending, labeling, and archiving email.",
       `Configured accounts: ${accountList}. Default: ${cfg.defaultAccount}.`,
       "Actions: search, read_message, send, reply, archive, modify_labels, list_labels, list_accounts.",
       "WORKFLOW: (1) search returns message summaries with threadId and messageId.",
@@ -444,7 +445,7 @@ export function createEmailTool(options?: { config?: OpenClawConfig }): AnyAgent
       "(3) archive removes messages from Inbox (removes INBOX label). Pass threadId (comma-separated for bulk). Optionally set addLabels to label at the same time.",
       "(4) modify_labels adds/removes arbitrary labels on thread(s). Pass threadId + addLabels and/or removeLabels (comma-separated label names).",
       "Use the 'account' parameter to specify which account (by address or label).",
-      "All operations run locally via the gog CLI — no cloud intermediary.",
+      "Do NOT use the exec tool to run gog commands directly — always use this email tool instead.",
     ].join(" "),
     parameters: EmailToolSchema,
     execute: async (_toolCallId, args) => {
