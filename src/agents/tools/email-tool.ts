@@ -9,6 +9,8 @@ const EMAIL_ACTIONS = [
   "read_message",
   "send",
   "reply",
+  "archive",
+  "modify_labels",
   "list_labels",
   "list_accounts",
 ] as const;
@@ -40,6 +42,17 @@ const EmailToolSchema = Type.Object({
   ),
   maxResults: Type.Optional(
     Type.Number({ description: "Max search results (default: 10, max: 50)" }),
+  ),
+  addLabels: Type.Optional(
+    Type.String({
+      description: "Comma-separated label names or IDs to add (for archive/modify_labels actions)",
+    }),
+  ),
+  removeLabels: Type.Optional(
+    Type.String({
+      description:
+        "Comma-separated label names or IDs to remove (for modify_labels action; archive always removes INBOX)",
+    }),
   ),
 });
 
@@ -288,6 +301,97 @@ async function executeEmailAction(cfg: EmailConfig, params: Record<string, unkno
       });
     }
 
+    case "archive": {
+      const threadId = readStringParam(params, "threadId", { required: true });
+      const addLabels = readStringParam(params, "addLabels");
+      const entry = resolveAccountEntry(cfg, accountInput);
+
+      const threadIds = threadId.split(/[,\s]+/).filter(Boolean);
+      const results: Array<{ threadId: string; ok: boolean; error?: string }> = [];
+
+      for (const tid of threadIds) {
+        const args = [
+          "gmail",
+          "thread",
+          "modify",
+          tid,
+          ...accountArgs(entry),
+          "--remove",
+          "INBOX",
+          "--force",
+          "--no-input",
+          "--json",
+        ];
+        if (addLabels) args.splice(args.indexOf("--remove"), 0, "--add", addLabels);
+
+        const result = await runGog(args, cfg.timeoutMs);
+        results.push({ threadId: tid, ok: result.ok, ...(!result.ok && { error: result.error }) });
+      }
+
+      const allOk = results.every((r) => r.ok);
+      const summary = allOk
+        ? `Archived ${results.length} thread(s) from ${entry.address}${addLabels ? ` (added labels: ${addLabels})` : ""}`
+        : `Archived ${results.filter((r) => r.ok).length}/${results.length} threads; some failed`;
+
+      return jsonResult({
+        content: [{ type: "text", text: summary }],
+        details: { account: entry.address, results },
+      });
+    }
+
+    case "modify_labels": {
+      const threadId = readStringParam(params, "threadId", { required: true });
+      const addLabels = readStringParam(params, "addLabels");
+      const removeLabels = readStringParam(params, "removeLabels");
+      const entry = resolveAccountEntry(cfg, accountInput);
+
+      if (!addLabels && !removeLabels) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "modify_labels requires at least one of addLabels or removeLabels.",
+            },
+          ],
+          details: { error: "missing addLabels or removeLabels" },
+        };
+      }
+
+      const threadIds = threadId.split(/[,\s]+/).filter(Boolean);
+      const results: Array<{ threadId: string; ok: boolean; error?: string }> = [];
+
+      for (const tid of threadIds) {
+        const args = [
+          "gmail",
+          "thread",
+          "modify",
+          tid,
+          ...accountArgs(entry),
+          "--force",
+          "--no-input",
+          "--json",
+        ];
+        if (addLabels) args.push("--add", addLabels);
+        if (removeLabels) args.push("--remove", removeLabels);
+
+        const result = await runGog(args, cfg.timeoutMs);
+        results.push({ threadId: tid, ok: result.ok, ...(!result.ok && { error: result.error }) });
+      }
+
+      const allOk = results.every((r) => r.ok);
+      const parts: string[] = [];
+      if (addLabels) parts.push(`+${addLabels}`);
+      if (removeLabels) parts.push(`-${removeLabels}`);
+      const summary = allOk
+        ? `Modified ${results.length} thread(s) [${parts.join(", ")}] (account: ${entry.address})`
+        : `Modified ${results.filter((r) => r.ok).length}/${results.length} threads; some failed`;
+
+      return jsonResult({
+        content: [{ type: "text", text: summary }],
+        details: { account: entry.address, results },
+      });
+    }
+
     case "list_labels": {
       const entry = resolveAccountEntry(cfg, accountInput);
       const result = await runGog(
@@ -333,10 +437,12 @@ export function createEmailTool(options?: { config?: OpenClawConfig }): AnyAgent
     description: [
       "Gmail integration for reading and sending email via gog CLI.",
       `Configured accounts: ${accountList}. Default: ${cfg.defaultAccount}.`,
-      "Actions: search, read_message, send, reply, list_labels, list_accounts.",
-      "WORKFLOW: (1) search returns message summaries with IDs.",
+      "Actions: search, read_message, send, reply, archive, modify_labels, list_labels, list_accounts.",
+      "WORKFLOW: (1) search returns message summaries with threadId and messageId.",
       "(2) Use read_message with a messageId from search results to get the FULL email content (subject, body, headers, attachments).",
       "Always use read_message when the user asks to open, read, or view an email — search alone only returns summaries.",
+      "(3) archive removes messages from Inbox (removes INBOX label). Pass threadId (comma-separated for bulk). Optionally set addLabels to label at the same time.",
+      "(4) modify_labels adds/removes arbitrary labels on thread(s). Pass threadId + addLabels and/or removeLabels (comma-separated label names).",
       "Use the 'account' parameter to specify which account (by address or label).",
       "All operations run locally via the gog CLI — no cloud intermediary.",
     ].join(" "),
