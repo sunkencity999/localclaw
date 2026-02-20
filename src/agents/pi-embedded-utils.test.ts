@@ -546,3 +546,58 @@ describe("formatReasoningMessage", () => {
     );
   });
 });
+
+describe("stripRawJsonToolCalls (via extractAssistantText)", () => {
+  const mkMsg = (text: string): AssistantMessage => ({
+    role: "assistant",
+    content: [{ type: "text", text }],
+    timestamp: Date.now(),
+  });
+
+  it("strips raw JSON tool call with parameters key", () => {
+    const result = extractAssistantText(
+      mkMsg('{"name": "write", "parameters":{"path":"memory/heartbeat-state.json"}}'),
+    );
+    expect(result).toBe("");
+  });
+
+  it("strips raw JSON tool call with arguments key", () => {
+    const result = extractAssistantText(
+      mkMsg('{"name": "exec", "arguments": {"command": "ls -la"}}'),
+    );
+    expect(result).toBe("");
+  });
+
+  it("strips tool call JSON embedded in surrounding text", () => {
+    const result = extractAssistantText(
+      mkMsg('Let me do that now.\n{"name": "write", "parameters":{"path":"foo.json"}}\nDone.'),
+    );
+    expect(result).toBe("Let me do that now.\nDone.");
+  });
+
+  it("preserves normal JSON that is not a tool call", () => {
+    const result = extractAssistantText(
+      mkMsg('Here is the config: {"port": 8080, "host": "localhost"}'),
+    );
+    expect(result).toBe('Here is the config: {"port": 8080, "host": "localhost"}');
+  });
+
+  it("preserves JSON with name key but no parameters/arguments", () => {
+    const result = extractAssistantText(mkMsg('User: {"name": "Alice", "age": 30}'));
+    expect(result).toBe('User: {"name": "Alice", "age": 30}');
+  });
+
+  it("strips multiple raw tool calls", () => {
+    const result = extractAssistantText(
+      mkMsg(
+        '{"name": "exec", "parameters": {"cmd": "a"}}\n{"name": "write", "parameters": {"path": "b"}}',
+      ),
+    );
+    expect(result).toBe("");
+  });
+
+  it("preserves text without any braces", () => {
+    const result = extractAssistantText(mkMsg("Hello, how are you?"));
+    expect(result).toBe("Hello, how are you?");
+  });
+});

@@ -4,6 +4,121 @@ import { sanitizeUserFacingText } from "./pi-embedded-helpers.js";
 import { formatToolDetail, resolveToolDisplay } from "./tool-display.js";
 
 /**
+ * Strip raw JSON tool call objects that some local models (e.g. GLM-4 via Ollama)
+ * emit as plain text instead of using the structured tool_calls API format.
+ *
+ * Matches patterns like:
+ *   {"name": "write", "parameters": {"path": "..."}}
+ *   {"name": "exec", "arguments": {"command": "..."}}
+ */
+export function stripRawJsonToolCalls(text: string): string {
+  if (!text) {
+    return text;
+  }
+  // Quick bail: must contain a "name" key to even look like a tool call.
+  if (!text.includes('"name"')) {
+    return text;
+  }
+
+  // Match top-level JSON objects that look like tool calls.
+  // We scan for '{' and attempt balanced-brace extraction, then check
+  // if the parsed object has the shape { name, parameters|arguments }.
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const braceIdx = text.indexOf("{", cursor);
+    if (braceIdx === -1) {
+      result += text.slice(cursor);
+      break;
+    }
+
+    // Copy everything before the brace.
+    result += text.slice(cursor, braceIdx);
+
+    // Try to extract a balanced JSON object.
+    const end = findBalancedBrace(text, braceIdx);
+    if (end === null) {
+      // Unbalanced — not JSON; keep the '{' and move on.
+      result += "{";
+      cursor = braceIdx + 1;
+      continue;
+    }
+
+    const candidate = text.slice(braceIdx, end);
+    if (looksLikeToolCall(candidate)) {
+      // Skip over whitespace/newlines after the stripped JSON.
+      cursor = end;
+      while (
+        cursor < text.length &&
+        (text[cursor] === "\n" || text[cursor] === "\r" || text[cursor] === " ")
+      ) {
+        cursor += 1;
+      }
+    } else {
+      // Not a tool call — keep the text.
+      result += candidate;
+      cursor = end;
+    }
+  }
+
+  return result.trim();
+}
+
+function findBalancedBrace(text: string, start: number): number | null {
+  if (text[start] !== "{") return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") {
+      depth++;
+      continue;
+    }
+    if (ch === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return null;
+}
+
+function looksLikeToolCall(json: string): boolean {
+  try {
+    const obj = JSON.parse(json);
+    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return false;
+    if (typeof obj.name !== "string") return false;
+    // Must have parameters, arguments, or params (common variants models use).
+    return (
+      (typeof obj.parameters === "object" && obj.parameters !== null) ||
+      (typeof obj.arguments === "object" && obj.arguments !== null) ||
+      (typeof obj.params === "object" && obj.params !== null)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Strip malformed Minimax tool invocations that leak into text content.
  * Minimax sometimes embeds tool calls as XML in text blocks instead of
  * proper structured tool calls. This removes:
@@ -212,7 +327,7 @@ export function extractAssistantText(msg: AssistantMessage): string {
         .filter(isTextBlock)
         .map((c) =>
           stripThinkingTagsFromText(
-            stripDowngradedToolCallText(stripMinimaxToolCallXml(c.text)),
+            stripRawJsonToolCalls(stripDowngradedToolCallText(stripMinimaxToolCallXml(c.text))),
           ).trim(),
         )
         .filter(Boolean)
