@@ -31,6 +31,16 @@ The gateway dashboard features an **LCARS-inspired interface** (Library Computer
 
 LocalClaw has gained a suite of intelligent features that transform it from a basic local chat interface into a proactive, self-managing AI assistant.
 
+### TUI Status Bar
+
+The terminal UI footer now shows **all three model tiers** so you always know which model is handling your message:
+
+```
+agent main | session main | ollama/llama3.1:8b | primary: ollama/glm-4.7-flash-fast:latest | orch: openai-codex/gpt-5.2-codex (auto) | tokens 12k/32k (37%)
+```
+
+The `primary:` label only appears when the active model differs from the configured primary (e.g., when the fast model is handling a simple message or the orchestrator is handling a complex one).
+
 ### Startup Health Check
 
 The gateway now validates your entire model stack on every boot:
@@ -47,16 +57,18 @@ LocalClaw uses a heuristic classifier to route every message to the right model 
 | Tier | Handles | Example messages | Typical model |
 |------|---------|-----------------|---------------|
 | **Fast (tiny)** | Greetings, yes/no, short chat | "hi", "thanks!", "what time is it?" | `llama3.2` (3B) |
-| **Local (primary)** | Lookups, simple tool calls | "show my calendar", "list files" | `glm-4.7-flash-fast` (30B) |
+| **Local (primary)** | Lookups, tool calls, email, calendar | "check my emails", "what's on my calendar?", "list files" | `glm-4.7-flash-fast` (30B) |
 | **API (orchestrator)** | Multi-step reasoning, code, external APIs | "fix the auth bug", "search my Jira issues" | `gpt-5.2-codex`, `claude-sonnet-4` |
 
 The classifier categorizes messages into three complexity levels:
 
-- **Simple** — no action keywords, short conversational messages → routed to the tiny fast model for sub-second responses
-- **Moderate** — display/lookup keywords (`show`, `list`, `find`, `open`, `inspect`) → stays on local primary model
+- **Simple** — no action keywords, short conversational messages → routed to the tiny fast model for sub-second responses. **Tools are disabled** and context is capped (default 4096 tokens) so the fast model stays fast and never hallucinates tool calls.
+- **Moderate** — display/lookup keywords (`show`, `list`, `find`, `open`), or tool-requiring resource keywords (`email`, `calendar`, `meeting`, `inbox`, `weather`, `contacts`, `notes`, `browse`) → stays on local primary model with full tool access
 - **Complex** — reasoning keywords (`fix`, `debug`, `create`, `build`), external API keywords (`search`, `send`, `read`, `check`, `fetch`), code patterns, file paths, URLs → escalated to the API orchestrator model
 
-This means users without API keys still get a fully functional agent (fast model + local model), while users with API access get the best quality for demanding tasks.
+Routing is **per-message, not sticky** — after the orchestrator handles a complex task, the next moderate message automatically returns to the local primary model. This prevents expensive API timeouts on routine follow-up questions.
+
+Users without API keys still get a fully functional agent (fast model + local model), while users with API access get the best quality for demanding tasks.
 
 #### Model Strategy Presets
 
@@ -707,10 +719,18 @@ Unlike cloud-optimized setups that only prune when cache TTL expires, LocalClaw 
 
 The agent is instructed to write progress, decisions, and state to `memory/` files in your workspace after every meaningful step — not just before compaction. This means context that would be lost during summarization is safely on disk.
 
-- `memory/state.md` — current task state, modified files, decisions
+- `memory/state.md` — **structured snapshot** of the user's current situation, written in five sections:
+  - **Active tasks** — what the user is working on right now
+  - **Recent decisions** — key choices or outcomes from this session
+  - **Pending items** — things the user asked about or needs to follow up on
+  - **User context** — name, preferences, time of day awareness, mood cues
+  - **Environment** — relevant tools, services, or accounts in use
 - `memory/progress.md` — completed steps and findings
 - `memory/plan.md` — task decomposition for multi-step work
 - `memory/notes.md` — learned preferences and project conventions
+- `memory/YYYY-MM-DD.md` — timestamped daily events and conversation highlights
+
+**Why `state.md` matters:** The fast model (tiny tier) has no tools — it can't read files. Instead, LocalClaw **injects a compact snapshot of `memory/state.md`** directly into the fast model's system prompt (capped at 800 chars). This gives even simple "hello" or "thanks" responses awareness of the user's current situation, active tasks, and preferences — without any tool overhead.
 
 **3. Tighter compaction with early memory flush**
 
@@ -825,6 +845,8 @@ pnpm localclaw
 ```
 
 On first run, LocalClaw detects your running model server, lists available models, and walks you through picking a default. This creates your config at `~/.localclaw/openclaw.local.json`.
+
+For Ollama users, the wizard also offers to enable **flash attention** (`OLLAMA_FLASH_ATTENTION=1`) in your shell config — this reduces memory usage and improves throughput on supported hardware.
 
 > **Important:** Make sure your model server (e.g. Ollama) is running *before* this step so LocalClaw can discover your models automatically.
 
