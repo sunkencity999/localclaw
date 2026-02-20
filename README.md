@@ -107,9 +107,41 @@ During onboarding (`localclaw configure`), you can choose a strategy preset:
 
 | Orchestrator strategy | Behavior |
 |---|---|
-| `auto` (default) | Complex messages → API, simple/moderate → local |
+| `auto` (default) | Complex messages → API, simple/moderate → local. Local timeout auto-escalates to API. |
 | `always` | Always try API first, local is fallback on failure |
-| `fallback-only` | Local handles everything, API only when local fails |
+| `fallback-only` | Local handles everything, API only when local fails. Timeout auto-escalates to API. |
+
+### Auto-Escalation on Local Model Timeout
+
+When an API orchestrator model is configured, LocalClaw applies **tiered timeouts** to local model runs:
+
+| Setup | Timeout | On timeout |
+|-------|---------|------------|
+| **Local + API orchestrator** | **4 minutes** | Automatically escalates to the API model |
+| **Local only (no API)** | **10 minutes** | Returns timeout error |
+
+This prevents slow local models from blocking you indefinitely. If your local model gets stuck in a multi-tool-call loop or generates slowly after receiving tool results, LocalClaw automatically hands the task to the faster API model — seamlessly, with no manual intervention.
+
+The timeout is configurable via `agents.defaults.timeoutSeconds` in your config if you want to override the defaults.
+
+### Text-Based Tool Call Recovery
+
+Some local models (e.g. GLM-4 via Ollama) report tool calling capabilities but their chat templates lack native structured tool call support. Instead of using the API's tool calling format, they emit raw JSON in their text output like:
+
+```json
+{"name": "exec", "parameters": {"command": "ls"}}
+```
+
+LocalClaw detects these text-based tool calls, matches them to registered tools (with fuzzy name matching and alias support), executes them, and feeds the results back to the model — all transparently. This works for any local model regardless of template limitations.
+
+**Guards prevent false positives:**
+- Only activates for local providers (Ollama, LM Studio, vLLM)
+- Skipped if the model already made structured tool calls in the same run
+- Raw JSON tool calls are always stripped from user-facing output
+
+### Smart Tool Prioritization
+
+The email tool includes explicit priority hints that guide models to use the structured `email` tool instead of shelling out to the underlying CLI via `exec`. This reduces multi-step tool call chains (e.g., 8 sequential `exec` calls) down to a single `email` tool call with the right action and parameters — faster, more reliable, and less likely to timeout.
 
 ### Session Auto-Save
 
