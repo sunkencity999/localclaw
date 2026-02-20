@@ -87,6 +87,12 @@ import {
   buildEmbeddedSystemPrompt,
   createSystemPromptOverride,
 } from "../system-prompt.js";
+import {
+  extractTextToolCalls,
+  executeTextToolCalls,
+  extractRawAssistantText,
+  formatTextToolResults,
+} from "../text-tool-calls.js";
 import { splitSdkTools } from "../tool-split.js";
 import { describeUnknownError, mapThinkingLevel } from "../utils.js";
 import { detectAndLoadPromptImages } from "./images.js";
@@ -818,6 +824,45 @@ export async function runEmbeddedAttempt(
           log.debug(
             `embedded run prompt end: runId=${params.runId} sessionId=${params.sessionId} durationMs=${Date.now() - promptStartedAt}`,
           );
+        }
+
+        // -----------------------------------------------------------------
+        // Text-based tool call interception
+        // Some local models output tool calls as raw JSON text instead of
+        // using the structured tool_calls API. Detect these, execute the
+        // tools, and feed results back so the model can summarize.
+        // -----------------------------------------------------------------
+        const TEXT_TOOL_CALL_MAX_RETRIES = 3;
+        if (!promptError && !aborted && tools.length > 0) {
+          for (let ttcRetry = 0; ttcRetry < TEXT_TOOL_CALL_MAX_RETRIES; ttcRetry++) {
+            const lastMsg = activeSession.messages
+              .slice()
+              .reverse()
+              .find((m) => m.role === "assistant");
+            if (!lastMsg) break;
+
+            const rawText = extractRawAssistantText(lastMsg);
+            const textCalls = extractTextToolCalls(rawText);
+            if (textCalls.length === 0) break;
+
+            log.info(
+              `text-tool-call: intercepted ${textCalls.length} call(s) from text ` +
+                `(retry ${ttcRetry + 1}/${TEXT_TOOL_CALL_MAX_RETRIES}): ` +
+                textCalls.map((c) => c.name).join(", "),
+            );
+
+            const results = await executeTextToolCalls(textCalls, tools, runAbortController.signal);
+            const resultPrompt = formatTextToolResults(results);
+
+            try {
+              await abortable(activeSession.prompt(resultPrompt));
+            } catch (err) {
+              // If the follow-up prompt fails, log and break — the original
+              // response (with JSON stripped) will still be shown.
+              log.warn(`text-tool-call: follow-up prompt failed: ${describeUnknownError(err)}`);
+              break;
+            }
+          }
         }
 
         try {
