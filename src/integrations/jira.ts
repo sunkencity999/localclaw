@@ -64,7 +64,7 @@ export class JiraClient {
     if (!config.apiToken) {
       throw new Error("Jira apiToken is required");
     }
-    const authType = config.authType ?? "basic";
+    const authType = config.authType ?? "pat";
     if (authType === "basic" && !config.email) {
       throw new Error(
         "Jira email is required for basic auth (set authType to 'pat' for Personal Access Tokens)",
@@ -72,7 +72,7 @@ export class JiraClient {
     }
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.authType = authType;
-    this.apiVersion = config.apiVersion ?? (authType === "pat" ? "2" : "3");
+    this.apiVersion = config.apiVersion ?? (authType === "basic" ? "3" : "2");
     this.email = config.email ?? "";
     this.apiToken = config.apiToken;
     this.defaultProject = config.defaultProject;

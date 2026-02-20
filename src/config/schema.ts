@@ -373,8 +373,8 @@ const FIELD_LABELS: Record<string, string> = {
   "integrations.jira": "Jira",
   "integrations.jira.enabled": "Enable Jira Integration",
   "integrations.jira.baseUrl": "Jira Base URL",
-  "integrations.jira.email": "Jira Email",
-  "integrations.jira.apiToken": "Jira API Token",
+  "integrations.jira.email": "Jira Email (Cloud only)",
+  "integrations.jira.apiToken": "Jira Personal Access Token",
   "integrations.jira.defaultProject": "Default Jira Project",
   "integrations.jira.timeoutSeconds": "Jira Timeout (sec)",
   "integrations.jira.maxResults": "Jira Max Results",
@@ -720,11 +720,12 @@ const FIELD_HELP: Record<string, string> = {
   "channels.slack.dm.policy":
     'Direct message access control ("pairing" recommended). "open" requires channels.slack.dm.allowFrom=["*"].',
   "integrations.jira.enabled":
-    "Enable Jira Cloud/Server integration for issue tracking and project management.",
-  "integrations.jira.baseUrl": "Your Jira instance URL (e.g. https://yourteam.atlassian.net).",
-  "integrations.jira.email": "Email address associated with your Jira API token.",
+    "Enable Jira Server/DC integration for issue tracking and project management.",
+  "integrations.jira.baseUrl": "Your Jira instance URL (e.g. https://jira.yourcompany.com).",
+  "integrations.jira.email":
+    "Email for basic auth (Cloud). Not needed for Personal Access Token auth.",
   "integrations.jira.apiToken":
-    "Jira API token (generate at https://id.atlassian.com/manage-profile/security/api-tokens).",
+    "Jira Personal Access Token (Profile \u2192 Personal Access Tokens \u2192 Create token).",
   "integrations.jira.defaultProject": "Default project key for creating issues (e.g. PROJ).",
   "integrations.jira.timeoutSeconds": "Timeout in seconds for Jira API requests (default: 30).",
   "integrations.jira.maxResults": "Maximum results returned by Jira searches (default: 50).",
@@ -758,8 +759,7 @@ const FIELD_PLACEHOLDERS: Record<string, string> = {
   "gateway.controlUi.basePath": "/openclaw",
   "channels.mattermost.baseUrl": "https://chat.example.com",
   "agents.list[].identity.avatar": "avatars/openclaw.png",
-  "integrations.jira.baseUrl": "https://yourteam.atlassian.net",
-  "integrations.jira.email": "you@example.com",
+  "integrations.jira.baseUrl": "https://jira.yourcompany.com",
   "integrations.jira.defaultProject": "PROJ",
   "integrations.confluence.baseUrl": "https://yourteam.atlassian.net",
   "integrations.confluence.email": "you@example.com",

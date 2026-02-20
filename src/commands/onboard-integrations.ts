@@ -84,9 +84,8 @@ async function setupJira(
       "add comments, and transition issue statuses.",
       "",
       "You'll need:",
-      "  - Your Jira instance URL (e.g. https://yourteam.atlassian.net)",
-      "  - An email address associated with your Atlassian account",
-      "  - An API token (https://id.atlassian.com/manage-profile/security/api-tokens)",
+      "  - Your Jira instance URL (e.g. https://jira.yourcompany.com)",
+      "  - A Personal Access Token (Profile → Personal Access Tokens → Create token)",
     ].join("\n"),
     "Jira setup",
   );
@@ -107,7 +106,7 @@ async function setupJira(
     await prompter.text({
       message: "Jira instance URL",
       initialValue: (existing.baseUrl as string) ?? "",
-      placeholder: "https://yourteam.atlassian.net",
+      placeholder: "https://jira.yourcompany.com",
       validate: (v) =>
         String(v ?? "")
           .trim()
@@ -117,25 +116,13 @@ async function setupJira(
     }),
   ).trim();
 
-  const email = String(
-    await prompter.text({
-      message: "Jira account email",
-      initialValue: (existing.email as string) ?? "",
-      placeholder: "you@example.com",
-      validate: (v) =>
-        String(v ?? "")
-          .trim()
-          .includes("@")
-          ? undefined
-          : "Must be a valid email address",
-    }),
-  ).trim();
-
   const hasToken = Boolean(existing.apiToken);
   const tokenInput = String(
     await prompter.text({
-      message: hasToken ? "Jira API token (leave blank to keep current)" : "Jira API token",
-      placeholder: hasToken ? "Leave blank to keep current" : "Paste your API token",
+      message: hasToken
+        ? "Personal Access Token (leave blank to keep current)"
+        : "Personal Access Token",
+      placeholder: hasToken ? "Leave blank to keep current" : "Paste your Personal Access Token",
     }),
   ).trim();
   const apiToken = tokenInput || (existing.apiToken as string) || "";
@@ -150,18 +137,18 @@ async function setupJira(
 
   const jira: Record<string, unknown> = {
     enabled: true,
+    authType: "pat",
+    apiVersion: "2",
     baseUrl,
-    email,
     apiToken,
     ...(defaultProject ? { defaultProject } : {}),
   };
 
   note(
     [
-      `Jira: enabled`,
+      `Jira: enabled (Server/DC, Personal Access Token)`,
       `URL: ${baseUrl}`,
-      `Email: ${email}`,
-      `API token: ${apiToken ? "***" : "not set"}`,
+      `Token: ${apiToken ? "***" : "not set"}`,
       `Default project: ${defaultProject || "(none)"}`,
     ].join("\n"),
     "Jira configured",
