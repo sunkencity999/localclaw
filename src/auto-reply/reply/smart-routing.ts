@@ -77,6 +77,15 @@ const MODERATE_KEYWORDS = [
   // Weather / external data
   "weather",
   "forecast",
+  // Gmail / filtering / labeling — requires tool access
+  "filter",
+  "filters",
+  "label",
+  "labels",
+  "archive",
+  "apply",
+  "retroactive",
+  "retroactively",
 ];
 
 /**
@@ -142,13 +151,79 @@ const COMPLEX_PATTERNS = [
   /~\/.+/, // Home-relative paths
   /\b\d+\.\d+\.\d+\b/, // Version numbers (e.g., 1.2.3)
   /https?:\/\//, // URLs
-  /\bfunction\b|\bclass\b|\bconst\b|\blet\b|\bvar\b/, // Code keywords
+  /\bfunction\b|\bclass\b|\bconst\b|\blet(?!')\b|\bvar\b/, // Code keywords (let(?!') excludes contractions like "let's")
   /\bimport\b.*\bfrom\b/, // Import statements
   /\berror\b.*\b(at|in)\b/i, // Stack traces
   /\n.*\n.*\n/, // Multi-line (3+ lines)
 ];
 
 const DEFAULT_MAX_SIMPLE_LENGTH = 150;
+
+/**
+ * Affirmative phrases that confirm a previously proposed action.
+ * When the assistant asks "Want me to X?" and the user replies "yes" or
+ * "go ahead", the fast model (no tools) cannot execute the action.
+ * These are matched at the start of the (lowercased, trimmed) message.
+ */
+const AFFIRMATIVE_PREFIXES = [
+  "yes",
+  "yeah",
+  "yep",
+  "yup",
+  "sure",
+  "ok",
+  "okay",
+  "go ahead",
+  "go for it",
+  "do it",
+  "do that",
+  "do so",
+  "please do",
+  "please go ahead",
+  "proceed",
+  "confirmed",
+  "confirm",
+  "affirmative",
+  "absolutely",
+  "definitely",
+  "sounds good",
+  "that works",
+  "perfect",
+  "let's do it",
+  "let's go",
+  "make it so",
+];
+
+/**
+ * Bare single-word affirmatives that are ambiguous without follow-up.
+ * "yes" alone could be conversational ("yes, I'm fine"); these only
+ * count as a confirmation when followed by additional words.
+ */
+const BARE_AMBIGUOUS = new Set(["yes", "yeah", "yep", "yup", "sure", "ok", "okay", "perfect"]);
+
+function isAffirmativeConfirmation(message: string): boolean {
+  const lower = message
+    .toLowerCase()
+    .replace(/[.,!;:]+/g, " ")
+    .trim();
+
+  for (const prefix of AFFIRMATIVE_PREFIXES) {
+    if (lower === prefix) {
+      // Bare affirmative with no follow-up — only treat multi-word action
+      // phrases ("go ahead", "do it", "proceed") as confirmations.
+      // Single-word ambiguous words stay "simple" (conversational).
+      return !BARE_AMBIGUOUS.has(prefix);
+    }
+    if (
+      lower.startsWith(prefix + " ") ||
+      lower.startsWith(prefix + ",") ||
+      lower.startsWith(prefix + ".")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Classify a user message as simple, moderate, or complex using heuristics.
@@ -201,6 +276,16 @@ export function classifyMessageComplexity(message: string): {
   const sentenceCount = trimmed.split(/[.!?]+/).filter((s) => s.trim().length > 0).length;
   if (sentenceCount >= 3) {
     return { complexity: "complex", reason: `${sentenceCount} sentences` };
+  }
+
+  // Affirmative confirmations that imply the user wants the agent to take
+  // a previously proposed action.  These must NOT be classified as "simple"
+  // because the fast model has no tools to execute the confirmed action.
+  if (isAffirmativeConfirmation(trimmed)) {
+    return {
+      complexity: "moderate",
+      reason: "affirmative confirmation (likely confirms a proposed action)",
+    };
   }
 
   // If it's a short message, it's likely simple

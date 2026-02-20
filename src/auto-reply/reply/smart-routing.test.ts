@@ -85,6 +85,43 @@ describe("classifyMessageComplexity", () => {
     expect(classifyMessageComplexity("").complexity).toBe("simple");
     expect(classifyMessageComplexity("   ").complexity).toBe("simple");
   });
+
+  it("classifies affirmative confirmations with follow-up as moderate", () => {
+    expect(
+      classifyMessageComplexity("Yes. Please do so for all of the labels we have created today.")
+        .complexity,
+    ).toBe("moderate");
+    expect(classifyMessageComplexity("Yes, go ahead").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("Sure, do that").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("Ok please proceed").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("Yeah that would be great").complexity).toBe("moderate");
+  });
+
+  it("classifies bare action-implying affirmatives as moderate", () => {
+    expect(classifyMessageComplexity("go ahead").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("do it").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("proceed").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("sounds good").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("let's do it").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("make it so").complexity).toBe("moderate");
+  });
+
+  it("keeps bare ambiguous single-word affirmatives as simple", () => {
+    expect(classifyMessageComplexity("yes").complexity).toBe("simple");
+    expect(classifyMessageComplexity("ok").complexity).toBe("simple");
+    expect(classifyMessageComplexity("sure").complexity).toBe("simple");
+    expect(classifyMessageComplexity("yeah").complexity).toBe("simple");
+    expect(classifyMessageComplexity("perfect").complexity).toBe("simple");
+  });
+
+  it("classifies filter/label/apply/archive keywords as moderate", () => {
+    expect(classifyMessageComplexity("apply the filters").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("add the Veeam label to those messages").complexity).toBe(
+      "moderate",
+    );
+    expect(classifyMessageComplexity("archive those messages").complexity).toBe("moderate");
+    expect(classifyMessageComplexity("apply retroactively").complexity).toBe("moderate");
+  });
 });
 
 describe("resolveSmartRoute", () => {
