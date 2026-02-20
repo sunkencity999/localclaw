@@ -34,7 +34,7 @@ import {
   shouldInjectLocalContextInstructions,
 } from "../../local-context-instructions.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
-import { resolveDefaultModelForAgent } from "../../model-selection.js";
+import { normalizeProviderId, resolveDefaultModelForAgent } from "../../model-selection.js";
 import {
   isCloudCodeAssistFormatError,
   resolveBootstrapMaxChars,
@@ -831,9 +831,27 @@ export async function runEmbeddedAttempt(
         // Some local models output tool calls as raw JSON text instead of
         // using the structured tool_calls API. Detect these, execute the
         // tools, and feed results back so the model can summarize.
+        //
+        // Guards:
+        // 1. Only for local providers (ollama, lmstudio, vllm) — cloud
+        //    providers always use structured tool calls.
+        // 2. Skip if the model already made structured tool calls in this
+        //    run (toolMetas.length > 0) — it has native support.
         // -----------------------------------------------------------------
         const TEXT_TOOL_CALL_MAX_RETRIES = 3;
-        if (!promptError && !aborted && tools.length > 0) {
+        const normalizedProvider = normalizeProviderId(params.provider);
+        const isLocalProvider =
+          normalizedProvider === "ollama" ||
+          normalizedProvider === "lmstudio" ||
+          normalizedProvider === "vllm";
+        const madeStructuredToolCalls = toolMetas.length > 0;
+        if (
+          !promptError &&
+          !aborted &&
+          tools.length > 0 &&
+          isLocalProvider &&
+          !madeStructuredToolCalls
+        ) {
           for (let ttcRetry = 0; ttcRetry < TEXT_TOOL_CALL_MAX_RETRIES; ttcRetry++) {
             const lastMsg = activeSession.messages
               .slice()
