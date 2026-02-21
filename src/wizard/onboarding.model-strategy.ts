@@ -5,6 +5,7 @@ import { loadModelCatalog } from "../agents/model-catalog.js";
 import { modelKey, normalizeProviderId } from "../agents/model-selection.js";
 import { createCliProgress } from "../cli/progress.js";
 import { isLocalModelProvider, LOCAL_MODEL_PROVIDERS } from "../commands/model-picker.js";
+import { runCommandWithTimeout } from "../process/exec.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,15 +87,31 @@ export async function promptModelStrategy(params: {
   try {
     catalog = await loadModelCatalog({ config, useCache: false });
   } catch {
-    await prompter.note(
-      [
-        "Could not load the model catalog (Ollama may not be running).",
-        "Proceeding with defaults — you can reconfigure later via:",
-        "  localclaw configure --section models",
-      ].join("\n"),
-      "Catalog unavailable",
-    );
-    catalog = [];
+    // Ollama may not be installed or running — try to fix that automatically.
+    const hasBinary = await isOllamaBinaryAvailable();
+    if (!hasBinary) {
+      const installed = await installOllama(prompter);
+      if (installed) {
+        await startOllamaServer(prompter);
+      }
+    } else if (!(await isOllamaReachable())) {
+      await startOllamaServer(prompter);
+    }
+
+    // Retry catalog load after install/start attempt.
+    try {
+      catalog = await loadModelCatalog({ config, useCache: false });
+    } catch {
+      await prompter.note(
+        [
+          "Could not load the model catalog (Ollama may not be running).",
+          "Proceeding with defaults — you can reconfigure later via:",
+          "  localclaw configure --section models",
+        ].join("\n"),
+        "Catalog unavailable",
+      );
+      catalog = [];
+    }
   }
 
   if (strategy === "all-api") {
@@ -380,6 +397,154 @@ async function promptApiModel(params: {
   return selected;
 }
 
+// ── Ollama binary detection, install, and start ─────────────────────────────
+
+async function isOllamaBinaryAvailable(): Promise<boolean> {
+  const cmd =
+    process.platform === "win32" ? ["where", "ollama"] : ["/usr/bin/env", "which", "ollama"];
+  try {
+    const result = await runCommandWithTimeout(cmd, { timeoutMs: 3000 });
+    return result.code === 0 && result.stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function installOllama(prompter: WizardPrompter): Promise<boolean> {
+  const isMac = process.platform === "darwin";
+  const isLinux = process.platform === "linux";
+
+  if (!isMac && !isLinux) {
+    await prompter.note(
+      "Automatic Ollama install is only supported on macOS and Linux.\nInstall manually: https://ollama.com",
+      "Manual install needed",
+    );
+    return false;
+  }
+
+  const method = isMac ? "Homebrew (brew install ollama)" : "official installer (curl)";
+  const shouldInstall = await prompter.confirm({
+    message: `Ollama is not installed. Install it now via ${method}?`,
+    initialValue: true,
+  });
+
+  if (!shouldInstall) {
+    await prompter.note(
+      "Skipped Ollama installation. Install it manually:\n  https://ollama.com\n\nThen re-run: localclaw onboard",
+      "Ollama required",
+    );
+    return false;
+  }
+
+  const progress = createCliProgress({
+    label: "Installing Ollama",
+    indeterminate: true,
+  });
+
+  try {
+    if (isMac) {
+      const result = await runCommandWithTimeout(["brew", "install", "ollama"], {
+        timeoutMs: 300_000, // 5 min
+      });
+      progress.done();
+      if (result.code !== 0) {
+        await prompter.note(
+          `Homebrew install failed (exit ${result.code}).\n${result.stderr.slice(0, 500)}\n\nInstall manually: https://ollama.com`,
+          "Install failed",
+        );
+        return false;
+      }
+    } else {
+      // Linux: use the official install script
+      const result = await runCommandWithTimeout(
+        ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
+        { timeoutMs: 300_000 },
+      );
+      progress.done();
+      if (result.code !== 0) {
+        await prompter.note(
+          `Ollama install script failed (exit ${result.code}).\n${result.stderr.slice(0, 500)}\n\nInstall manually: https://ollama.com`,
+          "Install failed",
+        );
+        return false;
+      }
+    }
+
+    // Verify the binary is now available
+    const found = await isOllamaBinaryAvailable();
+    if (found) {
+      await prompter.note("Ollama installed successfully.", "Ollama ready");
+      return true;
+    }
+    await prompter.note(
+      "Install completed but 'ollama' not found in PATH.\nYou may need to restart your terminal.\n\nManual install: https://ollama.com",
+      "Post-install check",
+    );
+    return false;
+  } catch (err) {
+    progress.done();
+    await prompter.note(
+      `Install error: ${err instanceof Error ? err.message : String(err)}\n\nInstall manually: https://ollama.com`,
+      "Install failed",
+    );
+    return false;
+  }
+}
+
+async function startOllamaServer(prompter: WizardPrompter): Promise<boolean> {
+  const isMac = process.platform === "darwin";
+
+  const progress = createCliProgress({
+    label: "Starting Ollama server",
+    indeterminate: true,
+  });
+
+  try {
+    if (isMac) {
+      // Try brew services first, then open the app, then raw serve
+      try {
+        await runCommandWithTimeout(["brew", "services", "start", "ollama"], {
+          timeoutMs: 10_000,
+        });
+      } catch {
+        try {
+          await runCommandWithTimeout(["open", "-a", "Ollama"], { timeoutMs: 5_000 });
+        } catch {
+          // Last resort: background serve
+          runCommandWithTimeout(["ollama", "serve"], { timeoutMs: 30_000 }).catch(() => {});
+        }
+      }
+    } else {
+      // Linux: background serve
+      runCommandWithTimeout(["ollama", "serve"], { timeoutMs: 30_000 }).catch(() => {});
+    }
+
+    // Wait up to 15 seconds for the server to respond
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (await isOllamaReachable()) {
+        progress.done();
+        await prompter.note("Ollama server is running.", "Server started");
+        return true;
+      }
+    }
+
+    progress.done();
+    await prompter.note(
+      "Ollama server did not respond within 15 seconds.\nTry starting it manually: ollama serve",
+      "Server start timeout",
+    );
+    return false;
+  } catch (err) {
+    progress.done();
+    await prompter.note(
+      `Could not start Ollama: ${err instanceof Error ? err.message : String(err)}\nStart it manually: ollama serve`,
+      "Start failed",
+    );
+    return false;
+  }
+}
+
 // ── Ollama model auto-download ───────────────────────────────────────────────
 
 async function isOllamaReachable(): Promise<boolean> {
@@ -474,18 +639,28 @@ async function ensureOllamaModels(params: {
 
   if (ollamaModels.length === 0) return;
 
-  const reachable = await isOllamaReachable();
+  // Check if Ollama binary exists; if not, offer to install it.
+  const binaryExists = await isOllamaBinaryAvailable();
+  if (!binaryExists) {
+    const installed = await installOllama(prompter);
+    if (!installed) return;
+  }
+
+  // Check if the server is reachable; if not, offer to start it.
+  let reachable = await isOllamaReachable();
   if (!reachable) {
-    await prompter.note(
-      [
-        "Ollama is not running. Start it before using local models.",
-        "",
-        "After starting Ollama, pull your models:",
-        ...ollamaModels.map((m) => `  ollama pull ${m}`),
-      ].join("\n"),
-      "Ollama not detected",
-    );
-    return;
+    const started = await startOllamaServer(prompter);
+    if (!started) {
+      await prompter.note(
+        [
+          "Ollama server is not responding. After starting it, pull your models:",
+          ...ollamaModels.map((m) => `  ollama pull ${m}`),
+        ].join("\n"),
+        "Ollama not ready",
+      );
+      return;
+    }
+    reachable = true;
   }
 
   // Check which models are missing
