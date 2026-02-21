@@ -330,7 +330,7 @@ Alternatively, edit your config file directly at `~/.localclaw/openclaw.local.js
 
 ### Jira Integration
 
-Connect your Jira Cloud or Jira Server/Data Center instance to let the agent manage issues, track projects, and automate workflows.
+Connect your Jira Server/Data Center or Jira Cloud instance to let the agent manage issues, track projects, and automate workflows.
 
 #### Capabilities
 
@@ -345,22 +345,21 @@ Connect your Jira Cloud or Jira Server/Data Center instance to let the agent man
 
 #### Prerequisites
 
-1. A Jira Cloud or Jira Server/Data Center instance
-2. **For Jira Cloud:** An Atlassian account email and API token — generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-3. **For Jira Server/Data Center:** A Personal Access Token (PAT) — generate one in your Jira profile settings under **Personal Access Tokens**
+1. A Jira Server/Data Center or Jira Cloud instance
+2. A **Personal Access Token** (PAT) — generate one in your Jira profile under **Personal Access Tokens → Create token**
+3. **For Jira Cloud (alternative):** An Atlassian account email and API token — generate at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
 #### Configuration
 
-**Jira Cloud** (default — uses email + API token):
+**Jira Server/Data Center** (default — uses Personal Access Token with Bearer auth):
 
 ```json5
 {
   integrations: {
     jira: {
       enabled: true,
-      baseUrl: "https://yourteam.atlassian.net",  // Your Jira instance URL
-      email: "you@example.com",                    // Atlassian account email
-      apiToken: "ATATT3x...",                      // API token (kept secret)
+      baseUrl: "https://jira.yourcompany.com",    // Your Jira Server URL
+      apiToken: "MDM2OTk1...",                     // Personal Access Token
       defaultProject: "PROJ",                      // Optional: default project key for new issues
       timeoutSeconds: 30,                          // Optional: API request timeout (default: 30)
       maxResults: 50,                              // Optional: max search results (default: 50)
@@ -369,17 +368,18 @@ Connect your Jira Cloud or Jira Server/Data Center instance to let the agent man
 }
 ```
 
-**Jira Server/Data Center** (uses Personal Access Token with Bearer auth):
+**Jira Cloud** (uses email + API token):
 
 ```json5
 {
   integrations: {
     jira: {
       enabled: true,
-      baseUrl: "https://jira.yourcompany.com",    // Your Jira Server URL
-      authType: "pat",                              // Use Personal Access Token auth
-      apiToken: "MDM2OTk1...",                     // Personal Access Token
-      apiVersion: "2",                              // REST API v2 (default for PAT)
+      authType: "basic",                            // Use email + API token auth
+      apiVersion: "3",                              // REST API v3 for Cloud
+      baseUrl: "https://yourteam.atlassian.net",  // Your Jira Cloud URL
+      email: "you@example.com",                    // Atlassian account email
+      apiToken: "ATATT3x...",                      // API token (kept secret)
       defaultProject: "PROJ",
     },
   },
@@ -388,8 +388,8 @@ Connect your Jira Cloud or Jira Server/Data Center instance to let the agent man
 
 | Config Key | Description |
 |------------|-------------|
-| `authType` | `"basic"` (default, Cloud) or `"pat"` (Personal Access Token, Server/DC) |
-| `apiVersion` | `"3"` (default for Cloud) or `"2"` (default for PAT/Server) |
+| `authType` | `"pat"` (default, Personal Access Token, Server/DC) or `"basic"` (email + API token, Cloud) |
+| `apiVersion` | `"2"` (default for PAT/Server) or `"3"` (default for Cloud) |
 
 #### Example Agent Interactions
 
@@ -832,26 +832,73 @@ These are picked up by both the model provider discovery and the gateway health 
 
 You can also point LocalClaw at any OpenAI-compatible API endpoint via the config or onboarding wizard.
 
-## Prerequisites
+---
 
-1. **Node 22+** — check with `node -v`
-2. **pnpm** — install with `npm install -g pnpm` if you don't have it
-3. **A local model server** — [Ollama](https://ollama.com) is the easiest to get started with:
+## Installation
+
+### One-Command Bootstrap (Recommended)
+
+On a fresh machine, this single script installs **everything** — git, curl, Homebrew (macOS), Node.js 22, pnpm, Ollama — then builds LocalClaw:
 
 ```bash
-# Install Ollama (macOS)
-brew install ollama
-
-# Start the Ollama server
-ollama serve
-
-# Pull a model (in a separate terminal)
-ollama pull qwen3:8b
+git clone https://github.com/sunkencity999/localclaw.git
+cd localclaw
+bash scripts/install-prereqs.sh
 ```
 
-> Any model works. Good starting points: `qwen3:8b`, `llama3.1`, `gemma3:12b`, `glm-4.7-flash`. Larger models give better results but need more RAM.
+The script detects your OS (macOS, Ubuntu/Debian, Fedora/RHEL, Arch) and uses the appropriate package manager. It skips anything already installed. Run with `--check` to see what's missing without installing anything.
 
-## Install
+After it finishes, jump straight to [Quick Start](#quick-start).
+
+### Manual Install (Step by Step)
+
+If you prefer to install prerequisites yourself:
+
+**1. Install Node.js 22+**
+
+```bash
+# macOS
+brew install node@22
+
+# Ubuntu/Debian
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Check version
+node -v   # Must be v22 or higher
+```
+
+**2. Install pnpm**
+
+```bash
+npm install -g pnpm
+```
+
+**3. Install Ollama**
+
+```bash
+# macOS
+brew install ollama
+
+# Linux
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+> **Note:** The `localclaw onboard` wizard will also offer to install Ollama automatically if it's not detected.
+
+**4. Start Ollama and pull a model**
+
+```bash
+# Start the server (leave running)
+ollama serve
+
+# In a new terminal, pull a model
+ollama pull llama3.1:8b
+```
+
+> Good starting points: `llama3.1:8b`, `gemma3:12b`, `qwen3:8b`, `glm-4.7-flash`. Larger models give better results but need more RAM.
+
+**5. Clone and build LocalClaw**
 
 ```bash
 git clone https://github.com/sunkencity999/localclaw.git
@@ -860,11 +907,13 @@ pnpm install
 pnpm build
 ```
 
-Optionally install globally so `localclaw` is available everywhere:
+**6. (Optional) Install globally**
 
 ```bash
 npm install -g .
 ```
+
+This puts `localclaw` on your PATH so you can run it from anywhere instead of using `pnpm localclaw`.
 
 ## Quick start
 
